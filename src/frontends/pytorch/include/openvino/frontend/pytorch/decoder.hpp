@@ -165,6 +165,11 @@ public:
 
     /// Dumps debug info
     virtual void debug() const = 0;
+
+    /// Returns new nodes for inputs inlined in the op itself
+    // Used in Torch.FX decoder
+    virtual OutputVector inlined_inputs (size_t start_index) const
+    { return {}; }
 };
 
 }  // namespace pytorch

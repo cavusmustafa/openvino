@@ -230,6 +230,11 @@ OutputVector convert_node(NodeContext* context) {
 /// \return fully converted OV Model
 std::shared_ptr<ov::Model> convert_pytorch_model(std::shared_ptr<Decoder> pytorch_model,
                                                  const TensorMap& external_tensor_map) {
+
+    // FIXME: don't use global variable to count inlined inputs, no we should use global counter because ID should be unique
+    // for all new inlined inputs
+    static size_t inlined_nodes_counter = 100000000;    // Suppose there are not graph with more than 10M nodes
+
     std::shared_ptr<ov::Model> resulting_model;  // define here to make a conversion in a nested scope
     {
         ParameterVector parameters;
@@ -264,6 +269,21 @@ std::shared_ptr<ov::Model> convert_pytorch_model(std::shared_ptr<Decoder> pytorc
         }
 
         auto node_visitor = [&](std::shared_ptr<Decoder> node) {
+
+            // Before querying for inputs, handle inlined inputs
+
+            auto inlined_inputs = node->inlined_inputs(inlined_nodes_counter);
+            for (size_t i = 0; i < inlined_inputs.size(); ++i) {
+                size_t fw_tensor_id = inlined_nodes_counter;
+                ++inlined_nodes_counter;     // TODO: Make sure that Decoder side use the same increment for producing ids
+                if (tensor_map.find(fw_tensor_id) != tensor_map.end()) {
+                    throw std::runtime_error("Duplicated producer for PT value with unique ID: " +
+                                             std::to_string(fw_tensor_id) + " produced by inlined_inputs");
+                }
+
+                tensor_map[fw_tensor_id] = inlined_inputs[i];
+            }
+
             // Explore all inputs of node. Node may refer to input value that hasn't been created in the current scope.
             // But this value can be found in the outer scope, for this purpose we create new input for the model to
             // link with external scope on a higher level.

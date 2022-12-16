@@ -101,6 +101,10 @@ class PyDecoder : public ov::frontend::pytorch::Decoder {
     void debug() const override {
         PYBIND11_OVERRIDE_PURE(void, Decoder, debug);
     }
+
+    ov::OutputVector inlined_inputs(size_t start_index) const override {
+        PYBIND11_OVERRIDE_PURE(ov::OutputVector, Decoder, inlined_inputs, start_index); }
+
 };
 
 void regclass_frontend_pytorch_decoder(py::module m);
