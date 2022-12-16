@@ -21,7 +21,9 @@
 #include "transformations/control_flow/unroll_if.hpp"
 #include "transforms.hpp"
 #include "transforms/aten_cat_replacer.hpp"
+#include "transforms/aten_getitem_replacer.hpp"
 #include "transforms/prim_list_unpack_replacer.hpp"
+#include "transforms/prim_tuple_construct_replacer.hpp"
 #include "utils.hpp"
 
 namespace ov {
@@ -102,6 +104,8 @@ void FrontEnd::normalize(const std::shared_ptr<ov::Model>& model) const {
 
     manager.register_pass<ov::frontend::pytorch::pass::AtenCatToConcat>();
     manager.register_pass<ov::frontend::pytorch::pass::PrimListUnpackReplacer>();
+    manager.register_pass<ov::frontend::pytorch::pass::AtenGetItemReplacer>();
+    manager.register_pass<ov::frontend::pytorch::pass::DecomposeTupleResults>();
     manager.register_pass<ngraph::pass::UnrollIf>();  // TODO: remove
     manager.register_pass<ngraph::pass::ConstantFolding>();
 

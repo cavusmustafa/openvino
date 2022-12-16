@@ -12,41 +12,70 @@ namespace pytorch {
 namespace op {
 
 OutputVector translate_convolution(NodeContext& context) {
-    // Shchema: aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[]
+    // Schema: aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[]
     // dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool
     // cudnn_enabled, bool allow_tf32) -> Tensor
-    bool transposed = context.const_input<bool>(6);
-    // TODO: Handle this temporary limitation
-    OV_FRONTEND_REQUIRE(!transposed);
 
     auto strides = context.const_input<Strides>(3);
-    auto pads_begin = context.const_input<CoordinateDiff>(4);  // FIXME: The same 4 is used twice
-    auto pads_end = context.const_input<CoordinateDiff>(4);    // FIXME: The same 4 is used twice
+    auto pads = context.const_input<CoordinateDiff>(4);
     auto dilations = context.const_input<Strides>(5);
-    // TODO: Handle skipped input 7 (6 was used above) -- what is it for?
+    bool transposed = context.const_input<bool>(6);
+    auto output_padding = context.const_input<CoordinateDiff>(7);
     auto groups = context.const_input<int64_t>(8);
 
     std::shared_ptr<ov::Node> conv;
     if (groups == 1) {
-        conv = std::make_shared<opset8::Convolution>(context.get_input(0),
-                                                     context.get_input(1),
-                                                     strides,
-                                                     pads_begin,
-                                                     pads_end,
-                                                     dilations);
+        if (!transposed) {
+            conv = context.mark_node(std::make_shared<opset8::Convolution>(context.get_input(0),
+                                                                           context.get_input(1),
+                                                                           strides,
+                                                                           pads,
+                                                                           pads,
+                                                                           dilations));
+        } else {
+            conv = context.mark_node(std::make_shared<opset8::ConvolutionBackpropData>(context.get_input(0),
+                                                                                       context.get_input(1),
+                                                                                       strides,
+                                                                                       pads,
+                                                                                       pads,
+                                                                                       dilations,
+                                                                                       ov::op::PadType::EXPLICIT,
+                                                                                       output_padding));
+        }
     } else {
-        conv = std::make_shared<opset8::GroupConvolution>(
-            context.get_input(0),
-            context.mark_output(reshape_kernel_for_group(context, context.get_input(0), context.get_input(1), groups)),
-            strides,
-            pads_begin,
-            pads_end,
-            dilations);
+        if (!transposed) {
+            conv = context.mark_node(std::make_shared<opset8::GroupConvolution>(
+                context.get_input(0),
+                context.mark_output(
+                    reshape_kernel_for_group(context, context.get_input(0), context.get_input(1), groups)),
+                strides,
+                pads,
+                pads,
+                dilations));
+        } else {
+            conv = context.mark_node(std::make_shared<opset8::GroupConvolutionBackpropData>(
+                context.get_input(0),
+                context.mark_output(
+                    reshape_kernel_for_group(context, context.get_input(0), context.get_input(1), groups)),
+                strides,
+                pads,
+                pads,
+                dilations,
+                ov::op::PadType::EXPLICIT,
+                output_padding));
+        }
+    }
+    if (!context.input_is_none(2)) {
+        auto bias = context.get_input(2);
+        auto bias_rank = bias.get_partial_shape().rank();
+        if (bias_rank == 1) {
+            bias = reshape_conv_bias(context, bias, conv);
+        }
+
+        conv = context.mark_node(std::make_shared<opset8::Add>(conv, bias));
     }
 
-    // FIXME: Doesn't work for dynamic rank
-    // FIXME: Works for 2D convolutions only
-    return {context.mark_output(make_optional_bias(conv, context, 2, {-2, -1}))};
+    return {context.mark_output(conv)};
 };
 
 }  // namespace op
