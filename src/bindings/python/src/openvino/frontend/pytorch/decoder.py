@@ -321,6 +321,9 @@ class TorchScriptPythonDecoder (Decoder):
         print(f'DEBUG CALLED FOR {self._raw_output(0)}')
         # self.pt_module.print()
 
+    def inlined_inputs(self, index):
+        return []
+
 
 def fetch_attr(fx_gm, target : str):
     module = fx_gm
@@ -335,8 +338,9 @@ import inspect
 
 class TorchFXPythonDecoder (Decoder):
 
-    def __init__(self, pt_module, fx_gm, nodes = None):
+    def __init__(self, pt_module, fx_gm, nodes=None, mark_node_callback=None):
         Decoder.__init__(self)
+        self.mark_node_callback = mark_node_callback
         # We store every decoder created by this decoder so that all them are not deleted until the first decoder is deleted
         self.m_decoders = []
         self.pt_module = pt_module
@@ -528,7 +532,7 @@ class TorchFXPythonDecoder (Decoder):
         for node in self._nodes:
             if node.op == 'placeholder' or node.op == 'output':
                 continue # skipping non-operational nodes
-            decoder = TorchFXPythonDecoder(node, self.fx_gm, self._nodes)
+            decoder = TorchFXPythonDecoder(node, self.fx_gm, self._nodes, mark_node_callback=self.mark_node_callback)
             self.m_decoders.append(decoder)
             node_visitor(decoder)
 
@@ -540,7 +544,7 @@ class TorchFXPythonDecoder (Decoder):
 
     def get_subgraph_decoder(self, index):
         print(f'[ FX DECODER DEBUG ] Decoder method called: {inspect.currentframe().f_code.co_name}')
-        decoder = TorchFXPythonDecoder(self.get_subgraphs()[index], self.fx_gm)
+        decoder = TorchFXPythonDecoder(self.get_subgraphs()[index], self.fx_gm, mark_node_callback=self.mark_node_callback)
         self.m_decoders.append(decoder)
         return decoder
 
@@ -592,6 +596,8 @@ class TorchFXPythonDecoder (Decoder):
 
     def mark_node(self, node):
         print(f'[ FX DECODER DEBUG ] Decoder method called: {inspect.currentframe().f_code.co_name}')
+        if self.mark_node_callback is not None:
+            self.mark_node_callback(self, node)
         return node
 
     def as_constant(self):
