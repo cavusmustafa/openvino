@@ -49,9 +49,12 @@ InputModel::Ptr FrontEnd::load_impl(const std::vector<ov::Any>& variants) const 
 }
 
 std::shared_ptr<ov::Model> FrontEnd::convert(const InputModel::Ptr& model) const {
+    std::cout << "DEBUG - frontend - convert - 1" << std::endl;
     FRONT_END_CHECK_IMPLEMENTED(m_actual, convert);
+    std::cout << "DEBUG - frontend - convert - 2" << std::endl;
     FRONTEND_RETURN_STATEMENT("Converting input model",
                               FrontEnd::create_copy(m_actual->convert(model->m_actual), m_shared_object))
+    std::cout << "DEBUG - frontend - convert - 3" << std::endl;
 }
 
 void FrontEnd::convert(const std::shared_ptr<Model>& model) const {
