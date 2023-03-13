@@ -77,6 +77,8 @@ def get_value_from_getattr(getattr_node, self_module):
 pt_to_ov_type_map = {
     "float": OVType.f32,
     "int": OVType.i32,
+    float: OVType.f32,
+    int: OVType.i32,
     "bool": OVType.boolean,
     "torch.float16": OVType.f16,
     "torch.float32": OVType.f32,
