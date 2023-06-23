@@ -216,6 +216,7 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.upsample_nearest2d.default": None,
             "torch.ops.aten.view.default": None,
             "torch.ops.aten.where.self": None,
+            "torch.ops.aten.zeros.default": None,
             "torch.ops.aten.zeros_like.default": None,
         }
 
