@@ -49,6 +49,26 @@ OutputVector translate_expand_as(const NodeContext& context) {
     return base_expand(context, x, sizes);
 };
 
+OutputVector translate_expand_fx(const NodeContext& context) {
+    // aten::expand(Tensor(a) self, SymInt[] size, *, bool implicit=False) -> Tensor(a)
+    num_inputs_check(context, 2, 3);
+    auto x = context.get_input(0);
+    auto sizes = context.get_input(1);
+    auto sizes_const = context.const_input<Shape>(1);
+    std::cout << "DEBUG - translate_expand_fx - x.shape: " << x.get_shape() << ", sizes: " << sizes_const << std::endl;
+    if (x.get_shape() == sizes_const) {
+        std::cout << "DEBUG - translate_expand_fx - no_op" << std::endl;
+        return {x};
+    }
+    // TODO: figure out what implicit means
+    FRONT_END_OP_CONVERSION_CHECK(context.input_is_none(2) || context.const_input<bool>(2) == false,
+                                  "Unexpected value of implicit for expand operation");
+    auto out = base_expand(context, x, sizes);
+    std::cout << "DEBUG - translate_expand_fx - out_shape: " << out[0].get_shape() << std::endl;
+    return out;
+    //return base_expand(context, x, sizes);
+};
+
 }  // namespace op
 }  // namespace pytorch
 }  // namespace frontend

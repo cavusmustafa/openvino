@@ -39,6 +39,8 @@
 #include "transforms/tuple_unpack_replacer.hpp"
 #include "translate_session.hpp"
 
+#include "openvino/op/softmax.hpp"
+
 namespace ov {
 namespace frontend {
 namespace pytorch {
@@ -126,6 +128,44 @@ std::shared_ptr<Model> FrontEnd::convert(const InputModel::Ptr& model) const {
     } catch (const std::exception& e) {
         norm_err = "\n-- normalize step failed with: " + std::string(e.what());
     }
+
+    
+    auto op_list = converted_model->get_ops();
+    
+    for (int i=0; i<op_list.size(); i++) {
+        auto op = op_list[i];
+        std::string op_type = op->get_type_name();
+        if (op_type == "Softmax") {
+            std::shared_ptr<ov::op::v8::Softmax> op_softmax = std::dynamic_pointer_cast<ov::op::v8::Softmax> (op);
+            auto axis = op_softmax->get_axis();
+            auto input_node = op->get_input_node_shared_ptr(0);
+            if (strcmp(input_node->get_type_name(), "Reshape") != 0)
+                continue;
+            auto input_src_node = input_node->get_input_node_shared_ptr(0);
+    
+            auto output_target_inputs = op->get_output_target_inputs(0);
+            if (output_target_inputs.size() != 1)
+                continue;
+            auto output_target_input = output_target_inputs.begin();
+            auto output_node = output_target_input->get_node();
+            if (strcmp(output_node->get_type_name(), "Reshape") != 0)
+                continue;
+            if (input_src_node->get_shape() != output_node->get_shape())
+                continue;
+            auto src_output = input_node->input(0).get_source_output();
+            src_output.remove_target_input(input_node->input(0));
+            auto new_softmax = std::make_shared<ov::op::v8::Softmax>(src_output, axis);
+            auto dst_inputs = output_node->output(0).get_target_inputs();
+            for (auto dst_input : dst_inputs)
+            {
+                dst_input.replace_source_output(new_softmax->output(0));
+            } 
+        }
+    }                                                                                                                                                                                                                                                                                                                                                             
+    converted_model = std::make_shared<ov::Model>(converted_model->get_results(),
+                                                  converted_model->get_parameters(),
+                                                  converted_model->get_friendly_name());
+    
 
     const auto& unconverted_ops = get_unconverted_types_from_model(converted_model);
     for (auto&& op : unconverted_ops) {

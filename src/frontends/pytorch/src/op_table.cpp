@@ -162,6 +162,7 @@ OP_CONVERTER(translate_arange_fx);
 OP_CONVERTER(translate_batch_norm_fx);
 OP_CONVERTER(translate_cat_fx);
 OP_CONVERTER(translate_chunk_fx);
+OP_CONVERTER(translate_expand_fx);
 OP_CONVERTER(translate_group_norm_fx);
 OP_CONVERTER(translate_index_fx);
 OP_CONVERTER(translate_layer_norm_fx);
@@ -450,7 +451,7 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.empty.memory_format", op::translate_empty},
         {"aten.eq.Tensor", op::translate_1to1_match_2_inputs_align_types<opset10::Equal>},
         {"aten.exp.default", op::translate_1to1_match_1_inputs<opset10::Exp>},
-        {"aten.expand.default", op::translate_expand},
+        {"aten.expand.default", op::translate_expand_fx},
         {"aten.full.default", op::translate_full},
         {"aten.gather.default", op::translate_gather},
         {"aten.gelu.default", op::translate_gelu},

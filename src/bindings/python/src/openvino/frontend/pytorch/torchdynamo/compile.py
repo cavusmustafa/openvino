@@ -12,7 +12,7 @@ from torch.fx import GraphModule
 
 from openvino.frontend import FrontEndManager
 from openvino.frontend.pytorch.decoder import TorchFXPythonDecoder
-from openvino.runtime import Core, Type, PartialShape
+from openvino.runtime import Core, Type, PartialShape, serialize
 
 from typing import Callable, Optional
 
@@ -38,6 +38,8 @@ def openvino_compile(gm: GraphModule, *args):
     print("@@Executing fe.convert(im)")
     om = fe.convert(im)
     print("!!Done with convert step!!")
+
+    serialize(om, "serialized.xml", "serialized.bin")
 
     dtype_mapping = {
         torch.float32: Type.f32,
