@@ -39,7 +39,7 @@ def openvino_compile(gm: GraphModule, *args):
     om = fe.convert(im)
     print("!!Done with convert step!!")
 
-    serialize(om, "serialized.xml", "serialized.bin")
+    serialize(om, "model_softmax_optimized.xml", "model_softmax_optimized.bin")
 
     dtype_mapping = {
         torch.float32: Type.f32,
