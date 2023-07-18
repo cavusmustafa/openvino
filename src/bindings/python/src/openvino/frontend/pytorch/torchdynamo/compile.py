@@ -18,28 +18,46 @@ from typing import Callable, Optional
 
 
 import numpy as np
-def openvino_compile(gm: GraphModule, *args):
-    fe_manager = FrontEndManager()
-    fe = fe_manager.load_by_framework('pytorch')
+def openvino_compile(gm: GraphModule, *args, model_hash_str : str = None):
+    core = Core()
+    
+    device = 'CPU'
 
-    input_shapes = []
-    input_types = []
-    for idx, input_data in enumerate(args): #subgraph.example_inputs):
-        input_types.append(input_data.type())
-        input_shapes.append(input_data.size())
+    if os.getenv("OPENVINO_DEVICE") is not None:
+        device = os.getenv("OPENVINO_DEVICE")
+        assert device in core.available_devices, "Specified device " + device + " is not in the list of OpenVINO Available Devices"
 
-    print("type(gm): ", type(gm))
-    decoder = TorchFXPythonDecoder(gm, gm, input_shapes=input_shapes, input_types=input_types)
+    file_name = None
+    if model_hash_str != None:
+        model_cache_dir = "./cache/model/"
+        os.makedirs(model_cache_dir, exist_ok=True)
+        file_name = model_cache_dir+model_hash_str+"_"+device
 
-    print("@@Executing fe.load(decoder)")
-    im = fe.load(decoder)
-    print("!!Decoder loaded successfully!!")
+    if file_name != None and os.path.isfile(file_name+".xml") and os.path.isfile(file_name+".bin"):
+        om = core.read_model(file_name+".xml")
+    else:
+        fe_manager = FrontEndManager()
+        fe = fe_manager.load_by_framework('pytorch')
 
-    print("@@Executing fe.convert(im)")
-    om = fe.convert(im)
-    print("!!Done with convert step!!")
+        input_shapes = []
+        input_types = []
+        for idx, input_data in enumerate(args): #subgraph.example_inputs):
+            input_types.append(input_data.type())
+            input_shapes.append(input_data.size())
 
-    serialize(om, "model_softmax_optimized.xml", "model_softmax_optimized.bin")
+        print("type(gm): ", type(gm))
+        decoder = TorchFXPythonDecoder(gm, gm, input_shapes=input_shapes, input_types=input_types)
+
+        print("@@Executing fe.load(decoder)")
+        im = fe.load(decoder)
+        print("!!Decoder loaded successfully!!")
+
+        print("@@Executing fe.convert(im)")
+        om = fe.convert(im)
+        print("!!Done with convert step!!")
+
+        if file_name != None:
+            serialize(om, file_name+".xml", file_name+".bin")
 
     dtype_mapping = {
         torch.float32: Type.f32,
@@ -56,13 +74,8 @@ def openvino_compile(gm: GraphModule, *args):
         om.inputs[idx].get_node().set_partial_shape(PartialShape(list(input_data.shape)))
     om.validate_nodes_and_infer_types()
 
-    core = Core()
-    
-    device = 'CPU'
-
-    if os.getenv("OPENVINO_DEVICE") is not None:
-        device = os.getenv("OPENVINO_DEVICE")
-        assert device in core.available_devices, "Specified device " + device + " is not in the list of OpenVINO Available Devices"
+    if model_hash_str != None:
+        core.set_property({'CACHE_DIR': './cache/blob'})
 
     compiled = core.compile_model(om, device)
     print("!!Returning compiled model!!")
