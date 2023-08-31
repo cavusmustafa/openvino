@@ -218,6 +218,13 @@ ov::op::v0::Constant::Constant(const element::Type& type, const ov::Shape& shape
     std::memcpy(get_data_ptr_nc(), data, size);
 }
 
+ov::op::v0::Constant::Constant(const element::Type& type, const ov::Shape& shape, const size_t data)
+    : Constant(false, type, shape) {
+    const void* data_ptr = (const void*)data;
+    size_t size = (shape_size(m_shape) * m_element_type.bitwidth() + 7) >> 3;
+    std::memcpy(get_data_ptr_nc(), data_ptr, size);
+}
+
 ov::op::v0::Constant::Constant(const Constant& other) {
     m_element_type = other.m_element_type;
     m_shape = other.m_shape;

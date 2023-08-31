@@ -124,6 +124,7 @@ void regclass_graph_op_Constant(py::module m) {
     constant.def(py::init<const ov::element::Type&, const ov::Shape&, const std::vector<uint16_t>&>());
     constant.def(py::init<const ov::element::Type&, const ov::Shape&, const std::vector<uint32_t>&>());
     constant.def(py::init<const ov::element::Type&, const ov::Shape&, const std::vector<uint64_t>&>());
+    constant.def(py::init<const ov::element::Type&, const ov::Shape&, const size_t>());
 
     constant.def("get_value_strings", &ov::op::v0::Constant::get_value_strings);
 

@@ -226,9 +226,7 @@ class TorchFXPythonDecoder (Decoder):
             ret = fetch_attr(self.fx_gm, self.pt_module.target)
             ovshape = PartialShape(ret.size())
             ovtype = pt_to_ov_type_map[str(ret.type())]
-            c_type = ctypes.POINTER(ov_to_c_type_map[ovtype])
-            data_c_ptr = ctypes.cast(ret.data_ptr(), c_type)
-            ov_const = op.Constant(ovtype, ovshape.get_shape(), data_c_ptr[:ret.nelement()])
+            ov_const = op.Constant(ovtype, ovshape.get_shape(), ret.data_ptr())
             return ov_const.outputs()
 
 
