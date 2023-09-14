@@ -79,6 +79,7 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.logsumexp.default": None,
             #"torch.ops.aten.masked_fill.Scalar": None,
             "torch.ops.aten.masked_fill_.Scalar": None,
+            "torch.ops.aten.masked_fill.Scalar": None,
             "torch.ops.aten.masked_fill.Tensor": None,
             "torch.ops.aten.max_pool2d_with_indices.default": None,
             "torch.ops.aten.mean.dim": None,
