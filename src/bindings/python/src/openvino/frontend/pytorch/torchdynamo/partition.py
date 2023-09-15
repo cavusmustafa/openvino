@@ -19,6 +19,7 @@ from openvino.frontend.pytorch.torchdynamo.op_support import OperatorSupport
 
 import typing as t
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -59,7 +60,15 @@ class Partitioner:
         partitioner = CapabilityBasedPartitioner(
             graph_module, self.supported_ops, allows_single_node_partition=False)
         partitions = partitioner.propose_partitions()
-        self.add_get_attr_inputs(partitions)
-        fused_graph_module = partitioner.fuse_partitions(partitions)
 
-        return fused_graph_module
+        new_partitions = []
+        min_num_nodes = 0
+        if os.getenv("OPENVINO_TORCH_MIN_NUM_NODES") is not None:
+            min_num_nodes = int(os.getenv("OPENVINO_TORCH_MIN_NUM_NODES"))
+        for part in partitions:
+            if len(part.nodes) > min_num_nodes:
+                new_partitions.append(part)
+        self.add_get_attr_inputs(new_partitions)
+        fused_graph_module = partitioner.fuse_partitions(new_partitions)
+
+        return fused_graph_module, len(new_partitions)
