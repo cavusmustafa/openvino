@@ -186,6 +186,7 @@ OP_CONVERTER(translate_quantized_convnd);
 OP_CONVERTER(translate_quantized_convnd_relu);
 OP_CONVERTER(translate_quantized_linear);
 // Torch FX Translations
+OP_CONVERTER(translate_any_fx);
 OP_CONVERTER(translate_arange_fx);
 OP_CONVERTER(translate_batch_norm_fx);
 OP_CONVERTER(translate_cat_fx);
@@ -193,12 +194,16 @@ OP_CONVERTER(translate_chunk_fx);
 OP_CONVERTER(translate_expand_fx);
 OP_CONVERTER(translate_group_norm_fx);
 OP_CONVERTER(translate_index_fx);
+OP_CONVERTER(translate_isinf_fx);
+OP_CONVERTER(translate_isnan_fx);
 OP_CONVERTER(translate_layer_norm_fx);
 OP_CONVERTER(translate_max_poolnd_fx);
 OP_CONVERTER(translate_slice_fx);
 OP_CONVERTER(translate_softmax_fx);
+OP_CONVERTER(translate_sort_fx);
 OP_CONVERTER(translate_split_with_sizes_fx);
 OP_CONVERTER(translate_stack_fx);
+OP_CONVERTER(translate_topk_fx);
 OP_CONVERTER(translate_transpose_fx);
 
 }  // namespace op
@@ -501,6 +506,7 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.add_.Tensor", op::translate_add},
         {"aten.addmm.default", op::translate_addmm},
         {"aten.all.default", op::translate_all},
+        {"aten.any.default", op::translate_any_fx},
         {"aten.arange.start", op::translate_arange_fx},
         {"aten.arange.start_step", op::translate_arange_fx},
         {"aten.arange.default", op::translate_arange_fx},
@@ -525,7 +531,7 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.eq.Tensor", op::translate_1to1_match_2_inputs_align_types<opset10::Equal>},
         {"aten.exp.default", op::translate_1to1_match_1_inputs<opset10::Exp>},
         {"aten.expand.default", op::translate_expand_fx},
-	{"aten.fill_.Tensor", op::inplace_op<op::translate_fill_>},
+        {"aten.fill_.Tensor", op::inplace_op<op::translate_fill_>},
         {"aten.full.default", op::translate_full},
         {"aten.gather.default", op::translate_gather},
         {"aten.gelu.default", op::translate_gelu},
@@ -534,6 +540,8 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.hardswish_.default", op::inplace_op<op::translate_1to1_match_1_inputs<opset10::HSwish>>},
         {"aten.hardtanh_.default", op::inplace_op<op::translate_hardtanh>},
         {"aten.index.Tensor", op::translate_index_fx},
+        {"aten.isinf.default", op::translate_isinf_fx},
+        {"aten.isnan.default", op::translate_isnan_fx},
         {"aten.le.Scalar", op::translate_1to1_match_2_inputs_align_types<opset10::LessEqual>},
         {"aten.lift_fresh_copy.default", op::skip_node},
         {"aten.linalg_vector_norm.default", op::translate_linalg_vector_norm},
@@ -565,14 +573,14 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.relu_.default", op::inplace_op<op::translate_1to1_match_1_inputs<opset10::Relu>>},
         {"aten.rsqrt.default", op::translate_rsqrt},
         {"aten.rsub.Scalar", op::translate_rsub},
-	{"aten.scatter.src", op::translate_scatter},
+        {"aten.scatter.src", op::translate_scatter},
         {"aten.select.int", op::translate_select},
         {"aten.sigmoid.default", op::translate_1to1_match_1_inputs<opset10::Sigmoid>},
         {"aten.silu.default", op::translate_1to1_match_1_inputs<opset10::Swish>},
         {"aten.silu_.default", op::inplace_op<op::translate_1to1_match_1_inputs<opset10::Swish>>},
         {"aten.sin.default", op::translate_1to1_match_1_inputs<opset10::Sin>},
         {"aten.slice.Tensor", op::translate_slice_fx},
-	{"aten.sort.default", op::translate_sort},
+        {"aten.sort.default", op::translate_sort_fx},
         {"aten.split.Tensor", op::translate_chunk_fx},
         {"aten.split_with_sizes.default", op::translate_split_with_sizes_fx},
         {"aten.stack.default", op::translate_stack_fx},
@@ -581,7 +589,7 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.sub.Tensor", op::translate_sub},
         {"aten.t.default", op::translate_t},
         {"aten.tanh.default", op::translate_1to1_match_1_inputs<opset10::Tanh>},
-	{"aten.topk.default", op::translate_topk},
+        {"aten.topk.default", op::translate_topk_fx},
         {"aten.transpose.int", op::translate_transpose},
         {"aten.tril.default", op::translate_tril},
         {"aten.unsqueeze.default", op::translate_1to1_match_2_inputs<opset10::Unsqueeze>},
