@@ -5,6 +5,7 @@
 #include "openvino/frontend/pytorch/node_context.hpp"
 #include "openvino/op/concat.hpp"
 #include "openvino/op/parameter.hpp"
+#include "openvino/op/unsqueeze.hpp"
 #include "openvino/op/reshape.hpp"
 #include "openvino/op/scatter_elements_update.hpp"
 #include "openvino/op/shape_of.hpp"
@@ -73,13 +74,22 @@ OutputVector translate_cat(const NodeContext& context) {
 
 OutputVector translate_cat_fx(const NodeContext& context) {
     // This translator is only needed to get axis as constant from external scope
+    // TODO: This is a temporary solution until the nested input issue is resolved
     num_inputs_check(context, 2, context.get_input_size());
-    std::deque<Output<Node>> list_elems;
-    for (size_t i = 0; i < context.get_input_size() - 1; i++) {
-        list_elems.push_back(context.get_input(static_cast<int>(i)));
+    if (context.get_input(context.get_input_size()-1).get_shape().size() == 0) {
+        std::deque<Output<Node>> list_elems;
+        for (size_t i = 0; i < context.get_input_size() - 1; i++) {
+            list_elems.push_back(context.get_input(static_cast<int>(i)));
+        }
+        auto axis = context.const_input<int64_t>(context.get_input_size() - 1);
+        return translate_cat_common(context, list_elems, axis, true);
+    } else {
+        std::deque<Output<Node>> list_elems;
+        for (size_t i = 0; i < context.get_input_size(); i++) {
+            list_elems.push_back(context.get_input(static_cast<int>(i)));
+        }
+        return translate_cat_common(context, list_elems, 0, true);
     }
-    auto axis = context.const_input<int64_t>(context.get_input_size() - 1);
-    return translate_cat_common(context, list_elems, axis, true);
 };
 
 OutputVector translate_quantized_cat(const NodeContext& context) {
@@ -92,6 +102,18 @@ OutputVector translate_quantized_cat(const NodeContext& context) {
                      context.get_input(2),
                      context.get_input(3),
                      list_elems.front())};
+};
+
+OutputVector translate_stack_fx(const NodeContext& context) {
+    // This translator is only needed to get axis as constant from external scope
+    num_inputs_check(context, 2, context.get_input_size());
+    std::deque<Output<Node>> list_elems;
+    for (size_t i = 0; i < context.get_input_size() - 1; i++) {
+        auto in_unsqueeze = context.mark_node(std::make_shared<v0::Unsqueeze>(context.get_input(static_cast<int>(i)), context.get_input(context.get_input_size() - 1)));
+        list_elems.push_back(in_unsqueeze);
+    }
+    auto axis = context.const_input<int64_t>(context.get_input_size() - 1);
+    return translate_cat_common(context, list_elems, axis, true);
 };
 
 }  // namespace op

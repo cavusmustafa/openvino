@@ -83,11 +83,20 @@ def openvino_execute(gm: GraphModule, *args, executor_parameters=None, partition
         if not fully_supported:
             model_hash_str = model_hash_str + "_p" + str(partition_id)
 
-    if use_cache and (partition_id in compiled_cache):
-        compiled = compiled_cache[partition_id]
+    #if use_cache and (partition_id in compiled_cache):
+    #    compiled = compiled_cache[partition_id]
+    #else:
+    #    compiled = openvino_compile(gm, *args, model_hash_str=model_hash_str)
+    #    compiled_cache[partition_id] = compiled
+
+    cached_pid = partition_id
+    #if cached_pid > 1:
+    #    cached_pid = 1
+    if use_cache and (cached_pid in compiled_cache):
+        compiled = compiled_cache[cached_pid]
     else:
         compiled = openvino_compile(gm, *args, model_hash_str=model_hash_str)
-        compiled_cache[partition_id] = compiled
+        compiled_cache[cached_pid] = compiled
 
     flat_args, _ = tree_flatten(args)
     ov_inputs = [a.detach().cpu().numpy() for a in flat_args]
@@ -113,11 +122,12 @@ class OpenVINOGraphModule(torch.nn.Module):
         if self.perm_fallback:
             return self.gm(*args)
 
-        try:
-            result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
-        except Exception:
-            self.perm_fallback = True
-            return self.gm(*args)
+        result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
+        #try:
+        #    result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
+        #except Exception:
+        #    self.perm_fallback = True
+        #    return self.gm(*args)
 
         return result
 
@@ -154,11 +164,11 @@ def openvino_execute_partitioned(gm: GraphModule, *args, executor_parameters=Non
     model_hash_str = executor_parameters.get("model_hash_str", None)
 
     signature = str(id(gm))
-    for idx, input_data in enumerate(args):
-        if isinstance(input_data, torch.Tensor):
-            signature = signature + "_" + str(idx) + ":" + str(input_data.type())[6:] + ":" + str(input_data.size())[11:-1].replace(" ", "")
-        else:
-            signature = signature + "_" + str(idx) + ":" + type(input_data).__name__ + ":val(" + str(input_data) + ")"
+    #for idx, input_data in enumerate(args):
+    #    if isinstance(input_data, torch.Tensor):
+    #        signature = signature + "_" + str(idx) + ":" + str(input_data.type())[6:] + ":" + str(input_data.size())[11:-1].replace(" ", "")
+    #    else:
+    #        signature = signature + "_" + str(idx) + ":" + type(input_data).__name__ + ":val(" + str(input_data) + ")"
 
     if signature not in partitioned_modules:
         partitioned_modules[signature] = partition_graph(gm, use_python_fusion_cache=use_python_fusion_cache,

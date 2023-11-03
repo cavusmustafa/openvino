@@ -56,10 +56,10 @@ OutputVector translate_expand_fx(const NodeContext& context) {
     // TODO: This is a temporary solution to optimize out Broadcast if the input and
     // output shapes are same. This should be removed after a proper optimization is
     // implemented.
-    auto sizes_const = context.const_input<Shape>(1);
-    if (x.get_shape() == sizes_const) {
-        return {x};
-    }
+    //auto sizes_const = context.const_input<Shape>(1);
+    //if (x.get_shape() == sizes_const) {
+    //    return {x};
+    //}
     auto sizes = context.get_input(1);
     // TODO: figure out what implicit means
     FRONT_END_OP_CONVERSION_CHECK(context.input_is_none(2) || context.const_input<bool>(2) == false,

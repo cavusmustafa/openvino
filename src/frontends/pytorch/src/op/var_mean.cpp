@@ -3,6 +3,7 @@
 //
 
 #include "openvino/frontend/pytorch/node_context.hpp"
+#include "openvino/op/util/framework_node.hpp"
 #include "openvino/op/convert_like.hpp"
 #include "openvino/op/divide.hpp"
 #include "openvino/op/gather.hpp"
@@ -79,6 +80,11 @@ OutputVector translate_var_mean(const NodeContext& context) {
 OutputVector translate_var(const NodeContext& context) {
     auto res = translate_var_mean(context);
     return {res[0]};
+}
+
+OutputVector translate_var_correction_fx(const NodeContext& context) {
+    auto res = translate_var_mean(context);
+    return {context.mark_node(make_list_construct(res))};
 }
 
 OutputVector translate_std(const NodeContext& context) {

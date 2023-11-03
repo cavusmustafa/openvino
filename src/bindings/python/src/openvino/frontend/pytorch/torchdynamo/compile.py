@@ -34,9 +34,15 @@ def cached_model_name(model_hash_str, device, args, cache_root, reversed = False
     inputs_str = ""
     for idx, input_data in enumerate(args):  
         if reversed:
-            inputs_str = "_" + str(input_data.type()) + str(input_data.size())[11:-1].replace(" ", "") + inputs_str
+            if isinstance(input_data, torch.SymInt):
+                inputs_str = "_"+str(type(input_data)) + inputs_str
+            else:
+                inputs_str = "_" + str(input_data.type()) + str(input_data.size())[11:-1].replace(" ", "") + inputs_str
         else:
-            inputs_str += "_" + str(input_data.type()) + str(input_data.size())[11:-1].replace(" ", "")
+            if isinstance(input_data, torch.SymInt):
+                inputs_str += "_"+str(type(input_data))
+            else:
+                inputs_str += "_" + str(input_data.type()) + str(input_data.size())[11:-1].replace(" ", "")
     inputs_str = sha256(inputs_str.encode('utf-8')).hexdigest()
     file_name += inputs_str
     
@@ -101,7 +107,46 @@ def openvino_compile(gm: GraphModule, *args, model_hash_str: str = None):
         input_types = []
         for idx, input_data in enumerate(args):  
             input_types.append(input_data.type())
-            input_shapes.append(input_data.size())
+            if input_data.size() == torch.Size([17, 1, 2, 128]):
+                input_shapes.append(torch.Size([-1, 1, 2, 128]))
+            elif input_data.size() == torch.Size([17, 1, 4096]):
+                input_shapes.append(torch.Size([-1, 1, 4096]))
+            elif input_data.size() == torch.Size([17, 1, 32, 2]):
+                input_shapes.append(torch.Size([-1, 1, 32, 2]))
+            elif input_data.size() == torch.Size([18, 1, 2, 128]):
+                input_shapes.append(torch.Size([-1, 1, 2, 128]))
+            elif input_data.size() == torch.Size([18, 1, 4096]):
+                input_shapes.append(torch.Size([-1, 1, 4096]))
+            elif input_data.size() == torch.Size([18, 1, 32, 2]):
+                input_shapes.append(torch.Size([-1, 1, 32, 2]))
+            elif input_data.size() == torch.Size([48, 1, 2, 128]):
+                input_shapes.append(torch.Size([-1, 1, 2, 128]))
+            elif input_data.size() == torch.Size([48, 1, 4096]):
+                input_shapes.append(torch.Size([-1, 1, 4096]))
+            elif input_data.size() == torch.Size([48, 1, 32, 2]):
+                input_shapes.append(torch.Size([-1, 1, 32, 2]))
+            elif input_data.size() == torch.Size([22, 1, 2, 128]):
+                input_shapes.append(torch.Size([-1, 1, 2, 128]))
+            elif input_data.size() == torch.Size([22, 1, 4096]):
+                input_shapes.append(torch.Size([-1, 1, 4096]))
+            elif input_data.size() == torch.Size([22, 1, 32, 2]):
+                input_shapes.append(torch.Size([-1, 1, 32, 2]))
+            elif input_data.size() == torch.Size([23, 1, 2, 128]):
+                input_shapes.append(torch.Size([-1, 1, 2, 128]))
+            elif input_data.size() == torch.Size([23, 1, 4096]):
+                input_shapes.append(torch.Size([-1, 1, 4096]))
+            elif input_data.size() == torch.Size([23, 1, 32, 2]):
+                input_shapes.append(torch.Size([-1, 1, 32, 2]))
+            elif input_data.size() == torch.Size([24, 1, 2, 128]):
+                input_shapes.append(torch.Size([-1, 1, 2, 128]))
+            elif input_data.size() == torch.Size([24, 1, 4096]):
+                input_shapes.append(torch.Size([-1, 1, 4096]))
+            elif input_data.size() == torch.Size([24, 1, 32, 2]):
+                input_shapes.append(torch.Size([-1, 1, 32, 2]))
+            elif input_data.size() == torch.Size([1, 32, 24, 128]):
+                input_shapes.append(torch.Size([1, 32, -1, 128]))
+            else:
+                input_shapes.append(input_data.size())
 
         decoder = TorchFXPythonDecoder(gm, gm, input_shapes=input_shapes, input_types=input_types)
 
@@ -125,7 +170,46 @@ def openvino_compile(gm: GraphModule, *args, model_hash_str: str = None):
 
     for idx, input_data in enumerate(args):
         om.inputs[idx].get_node().set_element_type(dtype_mapping[input_data.dtype])
-        om.inputs[idx].get_node().set_partial_shape(PartialShape(list(input_data.shape)))
+        if input_data.size() == torch.Size([17, 1, 2, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 2, 128]))))
+        elif input_data.size() == torch.Size([17, 1, 4096]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 4096]))))
+        elif input_data.size() == torch.Size([17, 1, 32, 2]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 32, 2]))))
+        elif input_data.size() == torch.Size([18, 1, 2, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 2, 128]))))
+        elif input_data.size() == torch.Size([18, 1, 4096]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 4096]))))
+        elif input_data.size() == torch.Size([18, 1, 32, 2]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 32, 2]))))
+        elif input_data.size() == torch.Size([48, 1, 2, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 2, 128]))))
+        elif input_data.size() == torch.Size([48, 1, 4096]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 4096]))))
+        elif input_data.size() == torch.Size([48, 1, 32, 2]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 32, 2]))))
+        elif input_data.size() == torch.Size([22, 1, 2, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 2, 128]))))
+        elif input_data.size() == torch.Size([22, 1, 4096]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 4096]))))
+        elif input_data.size() == torch.Size([22, 1, 32, 2]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 32, 2]))))
+        elif input_data.size() == torch.Size([23, 1, 2, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 2, 128]))))
+        elif input_data.size() == torch.Size([23, 1, 4096]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 4096]))))
+        elif input_data.size() == torch.Size([23, 1, 32, 2]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 32, 2]))))
+        elif input_data.size() == torch.Size([24, 1, 2, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 2, 128]))))
+        elif input_data.size() == torch.Size([24, 1, 4096]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 4096]))))
+        elif input_data.size() == torch.Size([23, 1, 32, 2]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([-1, 1, 32, 2]))))
+        elif input_data.size() == torch.Size([1, 32, 24, 128]):
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(torch.Size([1, 32, -1, 128]))))
+        else:
+            om.inputs[idx].get_node().set_partial_shape(PartialShape(list(input_data.shape)))
     om.validate_nodes_and_infer_types()
 
     if model_hash_str is not None:

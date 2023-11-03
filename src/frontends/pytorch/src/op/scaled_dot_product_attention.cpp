@@ -68,22 +68,25 @@ std::shared_ptr<ov::Node> translate_scaled_dot_product_attention_common(const No
     // two types of masks are supported. A boolean mask where a value of True indicates that the element should take
     // part in attention. A float mask of the same type as query, key, value that is added to the attention score.
     auto is_causal = false;
-    if (!context.input_is_none(5)) {
-        is_causal = context.const_input<bool>(5);
+    //if (!context.input_is_none(5)) {
+    //    is_causal = context.const_input<bool>(5);
+    //}
+    if (!context.input_is_none(4)) {
+        is_causal = context.const_input<bool>(4);
     }
     if (is_causal || !context.input_is_none(3)) {
         Output<Node> mask;
         Output<Node> atten_mask;
-        if (!context.input_is_none(3)) {
-            mask = context.get_input(3);
-            if (mask.get_element_type() == element::boolean) {
-                atten_mask = context.mark_node(std::make_shared<v1::ConvertLike>(mask, scaled_atten));
-                auto inv_mask = context.mark_node(std::make_shared<v1::LogicalNot>(mask));
-                atten_mask = context.mark_node(std::make_shared<v1::Select>(inv_mask, atten_mask, minus_inf));
-            } else {
-                atten_mask = mask;
-            }
-        } else {
+        //if (!context.input_is_none(3)) {
+        //    mask = context.get_input(3);
+        //    if (mask.get_element_type() == element::boolean) {
+        //        atten_mask = context.mark_node(std::make_shared<v1::ConvertLike>(mask, scaled_atten));
+        //        auto inv_mask = context.mark_node(std::make_shared<v1::LogicalNot>(mask));
+        //        atten_mask = context.mark_node(std::make_shared<v1::Select>(inv_mask, atten_mask, minus_inf));
+        //    } else {
+        //        atten_mask = mask;
+        //    }
+        //} else {
             auto target_s_len = context.mark_node(std::make_shared<v8::Gather>(q_shape, minus_two, zero_i));
             auto source_s_len = context.mark_node(std::make_shared<v8::Gather>(k_shape, minus_two, zero_i));
             auto ssl = context.mark_node(std::make_shared<v0::Unsqueeze>(source_s_len, zero_i));
@@ -98,7 +101,7 @@ std::shared_ptr<ov::Node> translate_scaled_dot_product_attention_common(const No
             vertical_range = context.mark_node(std::make_shared<v0::Unsqueeze>(vertical_range, one_i));
             auto triu = context.mark_node(std::make_shared<v1::GreaterEqual>(horizontal_range, vertical_range));
             atten_mask = context.mark_node(std::make_shared<v1::Select>(triu, mask, zero_f));
-        }
+        //}
         scaled_atten = context.mark_node(std::make_shared<v1::Add>(scaled_atten, atten_mask));
     }
     scaled_atten = context.mark_node(std::make_shared<v8::Softmax>(scaled_atten, -1));
