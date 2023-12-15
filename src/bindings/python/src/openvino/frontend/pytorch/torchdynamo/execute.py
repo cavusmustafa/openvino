@@ -129,8 +129,8 @@ class OpenVINOGraphModule(torch.nn.Module):
         if self.perm_fallback:
             return self.gm(*args)
 
-        #result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
-        result = self.gm(*args)
+        result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
+        #result = self.gm(*args)
         #try:
         #    result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
         #except Exception:
