@@ -214,6 +214,7 @@ def openvino_compile(gm: GraphModule, *args, model_hash_str: str = None):
 
     if model_hash_str is not None:
         core.set_property({'CACHE_DIR': cache_root + '/blob'})
+    #core.set_property(device, {"PERF_COUNT": "YES"})
 
     compiled = core.compile_model(om, device)
     return compiled

@@ -46,7 +46,9 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.avg_pool2d.default": None,
             "torch.ops.aten.baddbmm.default": None,
             "torch.ops.aten.bitwise_and.Tensor": None,
+            "torch.ops.aten.bitwise_and.Scalar": None,
             "torch.ops.aten.bitwise_not.default": None,
+            "torch.ops.aten.bitwise_right_shift.Tensor": None,
             "torch.ops.aten.bmm.default": None,
             "torch.ops.aten.cat.default": None,
             "torch.ops.aten.clamp_min.default": None,
@@ -141,6 +143,7 @@ class OperatorSupport(OperatorSupport):
     def is_node_supported(self, submodules: t.Mapping[str, Module], node: Node) -> bool:
         # OpenVINO FX subgraph should be purely functional
         if node.op not in CALLABLE_NODE_OPS:
+            print("DEBUG - is_node_supported - target: ", node.target, ", supported: ", False)
             return False
 
         # ops in supported_dict doesn't have overload name
@@ -149,6 +152,10 @@ class OperatorSupport(OperatorSupport):
             target = _get_qualified_name(node.target.overloadpacket)
 
             if target in self._support_dict:
+                print("DEBUG - is_node_supported - target: ", node.target, ", supported: ", True)
                 return True
 
-        return super().is_node_supported(submodules, node)
+        res = super().is_node_supported(submodules, node)
+        print("DEBUG - is_node_supported - target: ", node.target, ", supported: ", res)
+        return res
+        #return super().is_node_supported(submodules, node)

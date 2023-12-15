@@ -192,6 +192,7 @@ OP_CONVERTER(translate_triu);
 OP_CONVERTER(translate_tuple_index);
 OP_CONVERTER(translate_unflatten);
 OP_CONVERTER(translate_unfold);
+OP_CONVERTER(translate_unsqueeze);
 OP_CONVERTER(translate_upsample_bicubic2d);
 OP_CONVERTER(translate_upsample_bilinear2d);
 OP_CONVERTER(translate_upsample_bicubic2d_aa);
@@ -586,6 +587,7 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.avg_pool2d.default", op::translate_avg_poolnd},
         {"aten.baddbmm.default", op::translate_addmm},
         {"aten.bitwise_and.Tensor", op::translate_bitwise_and},
+        {"aten.bitwise_and.Scalar", op::translate_bitwise_and},
         {"aten.bitwise_not.default", op::translate_bitwise_not_fx},
         {"aten.bmm.default", op::translate_1to1_match_2_inputs_align_types<opset10::MatMul>},
         {"aten.cat.default", op::translate_cat_fx},
@@ -670,6 +672,7 @@ const std::map<std::string, CreatorFunction> get_supported_ops_fx() {
         {"aten.transpose.int", op::translate_transpose},
         {"aten.tril.default", op::translate_tril},
         {"aten.unsqueeze.default", op::translate_1to1_match_2_inputs<opset10::Unsqueeze>},
+        //{"aten.unsqueeze.default", op::translate_unsqueeze},
         {"aten.upsample_nearest2d.default", op::translate_upsample_nearest2d},
         {"aten.view.default", op::translate_reshape},
         {"aten.where.self", op::translate_where},

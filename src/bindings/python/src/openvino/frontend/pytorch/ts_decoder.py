@@ -23,6 +23,7 @@ class TorchScriptPythonDecoder (Decoder):
         self._input_signature = None
         self._shared_memory = shared_memory
         self._input_is_list = False
+        print("DEBUG - ts_decoder - A")
         if graph_element is None:
             try:
                 pt_module = self._get_scripted_model(pt_module, example_input, skip_freeze)

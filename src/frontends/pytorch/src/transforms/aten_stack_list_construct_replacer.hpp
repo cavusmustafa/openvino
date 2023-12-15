@@ -18,6 +18,12 @@ public:
     AtenStackListConstructReplacer();
 };
 
+class GPTQDecompressionReplacer : public ov::pass::MatcherPass {
+public:
+    OPENVINO_RTTI("ov::frontend::pytorch::pass::GPTQDecompressionReplacer");
+    GPTQDecompressionReplacer();
+};
+
 }  // namespace pass
 }  // namespace pytorch
 }  // namespace frontend

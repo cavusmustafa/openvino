@@ -68,6 +68,7 @@ class Partitioner:
             if len(part.nodes) > min_num_nodes:
                 new_partitions.append(part)
         self.add_get_attr_inputs(new_partitions)
+        print("DEBUG - partitions - num_partitions: ", len(new_partitions))
         fused_graph_module = partitioner.fuse_partitions(new_partitions)
 
         return fused_graph_module

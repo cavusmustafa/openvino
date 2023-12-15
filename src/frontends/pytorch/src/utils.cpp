@@ -475,6 +475,8 @@ void align_eltwise_input_types(const NodeContext& context, Output<Node>& lhs, Ou
     auto dst_type = infer_types(lhs, rhs, align_scalars);
     if (dst_type.is_dynamic()) {
         // We can't decide the type at this point, create a special operation
+        //std::cout << "DEBUG - translate_1to1_match_inputs_align_types - AlignTypes - context.op_type: " << context.get_op_type()
+        //          << ", lhs_type: " << lhs_type << ", rhs_type: " << rhs_type << std::endl;
         auto at = std::make_shared<AlignTypes>(lhs, rhs, align_scalars);
         lhs = at->output(0);
         rhs = at->output(1);

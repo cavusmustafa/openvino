@@ -101,7 +101,14 @@ def openvino_execute(gm: GraphModule, *args, executor_parameters=None, partition
     flat_args, _ = tree_flatten(args)
     ov_inputs = [a.detach().cpu().numpy() for a in flat_args]
 
-    res = compiled(ov_inputs)
+    #res = compiled(ov_inputs)
+    req = compiled.create_infer_request()                                                                                                                                                                                                                               
+    res = req.infer(ov_inputs)
+
+    pinfo = req.get_profiling_info()
+    #print("DEBUG - openvino_execute - pinfo - type: ", type(pinfo))
+    #for pc in pinfo:
+    #    print("\tDEBUG - openvino_execute - pc - type: ", pc.node_type, ", exec_type: ", pc.exec_type, ", name: ", pc.node_name, ", cpu_time: ", pc.cpu_time, ", real_time: ", pc.real_time, ", status: ", pc.status)
 
     results1 = [torch.from_numpy(res[out]) for out in compiled.outputs]
     if len(results1) == 1:
@@ -122,7 +129,8 @@ class OpenVINOGraphModule(torch.nn.Module):
         if self.perm_fallback:
             return self.gm(*args)
 
-        result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
+        #result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
+        result = self.gm(*args)
         #try:
         #    result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
         #except Exception:

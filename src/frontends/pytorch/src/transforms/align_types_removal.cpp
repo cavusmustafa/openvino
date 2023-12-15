@@ -28,14 +28,22 @@ AlignTypesRemoval::AlignTypesRemoval() {
     auto align_types_pattern = ov::pass::pattern::wrap_type<ov::op::util::FrameworkNode>();
 
     ov::matcher_pass_callback callback = [](ov::pass::pattern::Matcher& m) {
+        std::cout << "DEBUG - AlignTypeRemoval - A" << std::endl;
         auto align_types = std::dynamic_pointer_cast<AlignTypes>(m.get_match_root());
         if (!align_types)
             return false;
+        std::cout << "DEBUG - AlignTypeRemoval - B" << std::endl;
         auto lhs_itype = align_types->get_input_element_type(0);
         auto rhs_itype = align_types->get_input_element_type(1);
         auto lhs_otype = align_types->get_output_element_type(0);
         auto rhs_otype = align_types->get_output_element_type(1);
+        std::cout << "DEBUG - AlignTypeRemoval - C" << std::endl;
+        std::cout << "DEBUG - AlignTypeRemoval - C - lhs_itype: " << lhs_itype << std::endl;
+        std::cout << "DEBUG - AlignTypeRemoval - C - rhs_itype: " << rhs_itype << std::endl;
+        std::cout << "DEBUG - AlignTypeRemoval - C - lhs_otype: " << lhs_otype << std::endl;
+        std::cout << "DEBUG - AlignTypeRemoval - C - rhs_otype: " << rhs_otype << std::endl;
         if (lhs_otype.is_static() && rhs_otype.is_static()) {
+        std::cout << "DEBUG - AlignTypeRemoval - D" << std::endl;
             auto out1 = align_types->input_value(0);
             auto out2 = align_types->input_value(1);
             if (lhs_itype != lhs_otype)
@@ -46,6 +54,7 @@ AlignTypesRemoval::AlignTypesRemoval() {
             align_types->output(1).replace(out2);
             return true;
         }
+        std::cout << "DEBUG - AlignTypeRemoval - E" << std::endl;
         return false;
     };
 

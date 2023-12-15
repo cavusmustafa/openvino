@@ -8,6 +8,11 @@
 #include "openvino/op/concat.hpp"
 #include "openvino/op/constant.hpp"
 #include "openvino/op/unsqueeze.hpp"
+#include "openvino/op/broadcast.hpp"
+#include "openvino/op/select.hpp"
+#include "openvino/op/equal.hpp"
+#include "openvino/op/shape_of.hpp"
+#include "openvino/op/bitwise_and.hpp"
 #include "openvino/op/util/framework_node.hpp"
 #include "openvino/pass/pattern/matcher.hpp"
 #include "openvino/pass/pattern/op/wrap_type.hpp"
@@ -71,6 +76,91 @@ AtenStackListConstructReplacer::AtenStackListConstructReplacer() {
     };
 
     auto m = std::make_shared<Matcher>(stack, "ov::frontend::pytorch::pass::AtenStackListConstructReplacer");
+    this->register_matcher(m, callback);
+};
+
+GPTQDecompressionReplacer::GPTQDecompressionReplacer() {
+    auto const_1 = wrap_type<v0::Constant>();
+    auto const_2 = wrap_type<v0::Constant>();
+    auto unsqueeze_1 = wrap_type<v0::Unsqueeze>({const_1, const_2});
+    auto const_3 = wrap_type<v0::Constant>();
+    auto const_4 = wrap_type<v0::Constant>();
+    auto shape_of = wrap_type<ov::op::v3::ShapeOf>({const_3});
+    auto broadcast_1 = wrap_type<ov::op::v3::Broadcast>({const_4, shape_of});
+    auto equal = wrap_type<ov::op::v1::Equal>({const_3, broadcast_1});
+    auto const_5 = wrap_type<v0::Constant>();
+    auto broadcast_2 = wrap_type<ov::op::v3::Broadcast>({const_5, shape_of});
+    auto select = wrap_type<v1::Select>({equal, broadcast_2, const_3});
+    auto broadcast_3 = wrap_type<ov::op::v3::Broadcast>({unsqueeze_1, select});
+    auto const_6 = wrap_type<v0::Constant>();
+    auto const_7 = wrap_type<v0::Constant>();
+    auto unsqueeze_2 = wrap_type<v0::Unsqueeze>({const_6, const_7});
+    auto bitwise_right_shift = wrap_type<ov::op::util::FrameworkNode>({broadcast_3, unsqueeze_2});
+    auto and_mask = wrap_type<v0::Constant>();
+    auto align_types_1 = wrap_type<ov::op::util::FrameworkNode>({bitwise_right_shift, and_mask});
+    auto bitwise_and = wrap_type<ov::op::v13::BitwiseAnd>({align_types_1, align_types_1});
+    auto const_8 = wrap_type<v0::Constant>();
+    auto align_types_2 = wrap_type<ov::op::util::FrameworkNode>({bitwise_and, const_8});
+
+    ov::matcher_pass_callback callback = [=](Matcher& m) {
+        std::cout << "DEBUG - GPTQDecompressionReplacer - A" << std::endl;
+        auto align_types_2 = m.get_match_root();
+        //if (!stack) {
+        //    return false;
+        //}
+        const auto& pattern_map = m.get_pattern_value_map();
+        auto input_node = pattern_map.at(unsqueeze_1).get_node_shared_ptr();
+        auto weights_u32 = std::dynamic_pointer_cast<v0::Constant>(input_node->get_input_node_shared_ptr(0));
+
+        auto u8_shape = weights_u32->get_shape();
+        size_t full_size = shape_size(u8_shape);
+        auto src = weights_u32->get_data_ptr<uint32_t>();
+
+        auto u4_shape = u8_shape;
+        u4_shape.push_back(8);
+        auto new_const = std::make_shared<v0::Constant>(element::u4, u4_shape);
+        auto dst = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(new_const->get_data_ptr()));
+
+        std::copy(src, src + full_size, dst);  // TODO: Avoid copying, reuse the same constant
+        copy_runtime_info_and_name(weights_u32, {new_const}, {weights_u32, bitwise_and, bitwise_right_shift});
+        //return new_const;
+
+
+        //auto axis_node = pattern_map.at(axis).get_node_shared_ptr();
+        //auto axis_const = std::dynamic_pointer_cast<v0::Constant>(axis_node);
+        //auto axis = axis_const->cast_vector<int64_t>();
+        //if (axis.size() != 1) {
+        //    add_exception_to_fw_node(stack, "aten::stack has multiple axes, only one is supported.");
+        //    return false;
+        //}
+        //// Check if ListConstruct is an input
+        //if (auto list_construct_node = cast_fw_node(input_node, "prim::ListConstruct")) {
+        //    const auto& list_inputs = list_construct_node->input_values();
+        //    std::shared_ptr<Node> node;
+        //    if (auto compression = u4_compression_stack(list_inputs, axis[0])) {
+        //        node = compression;
+        //    } else {
+        //        OutputVector node_vector;
+        //        auto zero = v0::Constant::create(element::i32, Shape{}, {0});
+        //        // Iterate over values in ListConstruct
+        //        for (const auto& list_input : list_inputs) {
+        //            auto node = concat_list_construct(list_input);
+        //            auto unsqueezed_node = std::make_shared<v0::Unsqueeze>(node, axis_const);
+        //            node_vector.push_back(unsqueezed_node);
+        //        }
+        //        // Concat vectors on provided axis
+        //        node = std::make_shared<v0::Concat>(node_vector, axis[0]);
+        //    }
+
+        copy_runtime_info_and_name(bitwise_and, {new_const}, {input_node});
+        replace_node(align_types_2, new_const);
+        return true;
+        //}
+        //add_exception_to_fw_node(stack, "Unsupported case of aten::stack.");
+        //return false;
+    };
+
+    auto m = std::make_shared<Matcher>(bitwise_and, "ov::frontend::pytorch::pass::GPTQDecompressionReplacer");
     this->register_matcher(m, callback);
 };
 

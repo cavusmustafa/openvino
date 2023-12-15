@@ -8,6 +8,7 @@ from openvino.frontend.pytorch.py_pytorch_frontend import _FrontEndPytorchDecode
 from openvino.frontend.pytorch.py_pytorch_frontend import _Type as DecoderType
 from openvino.runtime import op, PartialShape, Type as OVType, OVAny, Shape
 from openvino.frontend.pytorch.utils import maybe_convert_max_int, make_constant, fetch_attr, pt_to_ov_type_map
+from openvino.frontend.pytorch import gptq
 
 import torch
 
@@ -38,6 +39,21 @@ class TorchFXPythonDecoder (Decoder):
                         args = args[0]
                     for output in args:
                         self._outputs.append(self._nodes.index(output))
+
+            print("DEBUG - fx_decoder - init")
+            #if gptq.detect_gptq_model(pt_module.graph):
+                #print("DEBUG - fx_decoder - gptq - detected")
+                #try:
+                #    gptq.patch_model(pt_module)
+                #    gptq_patched = True
+                #except Exception as error:
+                #    print('[ WARNING ] Failed patching of AutoGPTQ model. Error message:\n', error)
+                #    print('[ WARNING ] Tracing of the model will likely be unsuccesfull or incorrect')
+                #    gptq.unpatch_model(pt_module)
+                #    gptq_patched = False
+            #else:
+                #print("DEBUG - fx_decoder - gptq - not_detected")
+            #gptq.patch_model(pt_module)
 
         elif issubclass(type(pt_module), torch.fx.Node):
 
@@ -244,6 +260,35 @@ class TorchFXPythonDecoder (Decoder):
             return make_constant(OVType.boolean, Shape([]), [pt_value.toIValue()]).outputs()
 
         return None
+
+    def const_input(self, index):
+
+        input_node = self._raw_input(index)
+
+        if input_node.op == 'get_attr':
+            # Extract Constant from FX module field
+            ret = fetch_attr(self.fx_gm, input_node.target)
+            ov_const = op.Constant(ret.numpy(), shared_memory=True)
+            return OVAny(ov_const.outputs())
+
+
+        #if not self.get_op_type() == 'prim::Constant':
+        #    return None
+        #pt_value = self._raw_output(0)
+
+        #pt_type_class = pt_value.type().__class__
+        #if pt_type_class is torch.TensorType:
+        #    return self.as_constant_tensor(pt_value)
+        #if pt_type_class is torch.ListType:
+        #    return self.as_constant_list(pt_value)
+        #if str(pt_value.type()) in ['torch.int32', 'int']:
+        #    return make_constant(OVType.i32, Shape([]), [pt_value.toIValue()]).outputs()
+        #if str(pt_value.type()) in ['torch.float', 'torch.FloatType', 'float']:
+        #    return make_constant(OVType.f32, Shape([]), [pt_value.toIValue()]).outputs()
+        #if str(pt_value.type()) in ['torch.bool', 'bool']:
+        #    return make_constant(OVType.boolean, Shape([]), [pt_value.toIValue()]).outputs()
+
+        return OVAny(None)
 
     def as_string(self):
         if not self.get_op_type() == 'prim::Constant':
