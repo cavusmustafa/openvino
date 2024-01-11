@@ -102,10 +102,10 @@ def openvino_execute(gm: GraphModule, *args, executor_parameters=None, partition
     ov_inputs = [a.detach().cpu().numpy() for a in flat_args]
 
     #res = compiled(ov_inputs)
-    req = compiled.create_infer_request()                                                                                                                                                                                                                               
+    req = compiled.create_infer_request()
     res = req.infer(ov_inputs)
 
-    pinfo = req.get_profiling_info()
+    #pinfo = req.get_profiling_info()
     #print("DEBUG - openvino_execute - pinfo - type: ", type(pinfo))
     #for pc in pinfo:
     #    print("\tDEBUG - openvino_execute - pc - type: ", pc.node_type, ", exec_type: ", pc.exec_type, ", name: ", pc.node_name, ", cpu_time: ", pc.cpu_time, ", real_time: ", pc.real_time, ", status: ", pc.status)
@@ -131,6 +131,25 @@ class OpenVINOGraphModule(torch.nn.Module):
 
         result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
         #result = self.gm(*args)
+
+        #print("DEBUG - execute - result - type: ", type(result))
+        #if isinstance(result, torch.Tensor):
+        #    print("\tDEBUG - execute - result - sum: ", torch.sum(result))
+        #    print("\tDEBUG - execute - result - dtype: ", result.dtype)
+        #    print("\tDEBUG - execute - result - shape: ", result.shape)
+        #    print("\tDEBUG - execute - result - dim_order: ", result.dim_order())
+        #    print("\tDEBUG - execute - result - flattened: ", torch.flatten(result))
+        #    print("\tDEBUG - execute - result - val: ", result)
+        #    torch.save(result, "result_pt.pt")
+        #else:
+        #    print("DEBUG - execute - result - num_results: ", len(result))
+        #    for res in result:
+        #        print("\tDEBUG - execute - result - sum: ", torch.sum(res))
+        #        print("\tDEBUG - execute - result - dtype: ", res.dtype)
+        #        print("\tDEBUG - execute - result - shape: ", res.shape)
+        #        print("\tDEBUG - execute - result - val: ", res)
+        #exit()
+
         #try:
         #    result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id)
         #except Exception:

@@ -131,7 +131,8 @@ std::shared_ptr<Model> FrontEnd::convert(const ov::frontend::InputModel::Ptr& mo
     //    }
     //    for (int i=0; i<node->get_input_size(); i++) {
     //        std::cout << "\tDEBUG - FrontEnd - converted_model - input - i: " << i << ", type: " << node->get_input_node_shared_ptr(i)->get_type_name()
-    //                  << ", name: " << node->get_input_node_shared_ptr(i)->get_name() << ", input_shape: " << node->get_input_partial_shape(i) << std::endl;
+    //                  << ", name: " << node->get_input_node_shared_ptr(i)->get_name() << ", input_shape: " << node->get_input_partial_shape(i)
+    //                  << ", input_type: " << node->get_input_element_type(i) << std::endl;
     //    }
     //}
 
@@ -142,18 +143,18 @@ std::shared_ptr<Model> FrontEnd::convert(const ov::frontend::InputModel::Ptr& mo
         norm_err = "\n-- normalize step failed with: " + std::string(e.what());
     }
 
-    for (auto node : converted_model->get_ops()) {
-        std::cout << "DEBUG - FrontEnd - converted_model - type: " << node->get_type_name() << ", name: " << node->get_name() << ", input_size: " << node->get_input_size() << std::endl;
-        auto fw_node = std::dynamic_pointer_cast<PtFrameworkNode>(node);
-        if (fw_node) {
-            std::cout << "\tDEBUG - FrontEnd - converted_model - fw_type: " << fw_node->get_op_type() << std::endl;
-        }
-        for (int i=0; i<node->get_input_size(); i++) {
-            std::cout << "\tDEBUG - FrontEnd - converted_model - input - i: " << i << ", type: " << node->get_input_node_shared_ptr(i)->get_type_name()
-                      << ", name: " << node->get_input_node_shared_ptr(i)->get_name() << ", input_shape: " << node->get_input_partial_shape(i)
-                      << ", input_type: " << node->get_input_element_type(i) << std::endl;
-        }
-    }
+    //for (auto node : converted_model->get_ops()) {
+    //    std::cout << "DEBUG - FrontEnd - converted_model - type: " << node->get_type_name() << ", name: " << node->get_name() << ", input_size: " << node->get_input_size() << std::endl;
+    //    auto fw_node = std::dynamic_pointer_cast<PtFrameworkNode>(node);
+    //    if (fw_node) {
+    //        std::cout << "\tDEBUG - FrontEnd - converted_model - fw_type: " << fw_node->get_op_type() << std::endl;
+    //    }
+    //    for (int i=0; i<node->get_input_size(); i++) {
+    //        std::cout << "\tDEBUG - FrontEnd - converted_model - input - i: " << i << ", type: " << node->get_input_node_shared_ptr(i)->get_type_name()
+    //                  << ", name: " << node->get_input_node_shared_ptr(i)->get_name() << ", input_shape: " << node->get_input_partial_shape(i)
+    //                  << ", input_type: " << node->get_input_element_type(i) << std::endl;
+    //    }
+    //}
 
     const auto& unconverted_ops = get_unconverted_types_from_model(converted_model);
     for (auto&& op : unconverted_ops) {
@@ -197,7 +198,6 @@ void FrontEnd::normalize(const std::shared_ptr<ov::Model>& model) const {
 
     manager.register_pass<ov::frontend::pytorch::pass::GPTQDecompressionReplacer>();
     manager.register_pass<ov::frontend::pytorch::pass::AlignTypesRemoval>();
-    //manager.register_pass<ov::frontend::pytorch::pass::AlignTypesRemoval>();
     // the following 2 transformations are needed for keypoint detectron2 models to work.
     // AtenIndexToSelect will be called twice
     manager.register_pass<ov::pass::ConvertConvertLike>();

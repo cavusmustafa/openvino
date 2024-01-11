@@ -1073,6 +1073,8 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<opset4::Constan
     // Get source element type and source data
     auto src_type = constant->get_element_type();
     const auto* src_data = reinterpret_cast<const uint8_t*>(constant->get_data_ptr());
+    //std::cout << "DEBUG - convert_low_precisions_int - src.type: " << constant->get_element_type()
+    //          << ", src.data: " << std::hex << (uint32_t)(src_data[0]) << std::dec << std::endl;
 
     // We support conversion only if several elements can be represented in one instance of some
     // C++ common data type without any exception, destination data type should be bigger than
@@ -1103,9 +1105,12 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<opset4::Constan
     for (size_t i = 0; i < size; i++) {
         // Source type at the current moment always less than 1 byte
         // Select the right destination type
+        const uint8_t src_data_swapped = (src_data[src_idx] >> 4) | (src_data[src_idx] << 4);
         switch (to.size()) {
         case 1:
-            convert_lp_value<uint8_t, uint8_t>(src_data[src_idx],
+            //std::cout << "DEBUG - convert_low_precicions - case 1" << std::endl;
+            //convert_lp_value<uint8_t, uint8_t>(src_data[src_idx],
+            convert_lp_value<uint8_t, uint8_t>(src_data_swapped,
                                                dst_data[dst_idx],
                                                src_off,
                                                src_type.bitwidth(),
@@ -1163,6 +1168,12 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<opset4::Constan
             dst_idx++;
         }
     }
+    //std::cout << "debug - convert_low_precisions_int - 0 - dst.type: " << new_constant->get_element_type()
+    //          << ", dst.data: " << std::hex << (uint32_t)(dst_data[0]) <<", src.data: " << (uint32_t)(src_data[0]) << std::dec << std::endl;
+    //std::cout << "debug - convert_low_precisions_int - 1 - dst.type: " << new_constant->get_element_type()
+    //          << ", dst.data: " << std::hex << (uint32_t)(dst_data[1]) <<", src.data: " << (uint32_t)(src_data[1])  << std::dec << std::endl;
+    //std::cout << "debug - convert_low_precisions_int - 2 - dst.type: " << new_constant->get_element_type()
+    //          << ", dst.data: " << std::hex << (uint32_t)(dst_data[2]) <<", src.data: " << (uint32_t)(src_data[2])  << std::dec << std::endl;
 
     return new_constant;
 }

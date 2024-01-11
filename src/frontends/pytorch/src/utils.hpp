@@ -129,13 +129,13 @@ OutputVector translate_1to1_match_2_inputs_align_types(const NodeContext& contex
     auto lhs_type = context.get_input_type(0);
     auto rhs_type = context.get_input_type(1);
     // If type is string or None, we shouldn't align
-    std::cout << "DEBUG - translate_1to1_match_inputs_align_types - A - op_type: " << context.get_op_type() << std::endl;
+    //std::cout << "DEBUG - translate_1to1_match_inputs_align_types - A - op_type: " << context.get_op_type() << std::endl;
     if (!lhs_type.is<type::Str>() && !rhs_type.is<type::Str>() && !lhs_type.is<type::PyNone>() &&
         !rhs_type.is<type::PyNone>()) {
-    std::cout << "DEBUG - translate_1to1_match_inputs_align_types - B" << std::endl;
+        //std::cout << "DEBUG - translate_1to1_match_inputs_align_types - B" << std::endl;
         align_eltwise_input_types(context, lhs, rhs, true);
     }
-    std::cout << "DEBUG - translate_1to1_match_inputs_align_types - C" << std::endl;
+    //std::cout << "DEBUG - translate_1to1_match_inputs_align_types - C" << std::endl;
     OutputVector res = {context.mark_node(std::make_shared<T>(lhs, rhs))};
     align_output_types(context, res);
     return res;

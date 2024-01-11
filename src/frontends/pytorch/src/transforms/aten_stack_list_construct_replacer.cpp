@@ -103,7 +103,7 @@ GPTQDecompressionReplacer::GPTQDecompressionReplacer() {
     auto align_types_2 = wrap_type<ov::op::util::FrameworkNode>({bitwise_and, const_8});
 
     ov::matcher_pass_callback callback = [=](Matcher& m) {
-        std::cout << "DEBUG - GPTQDecompressionReplacer - A" << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A" << std::endl;
         auto align_types_2 = m.get_match_root();
         //if (!stack) {
         //    return false;
@@ -111,18 +111,113 @@ GPTQDecompressionReplacer::GPTQDecompressionReplacer() {
         const auto& pattern_map = m.get_pattern_value_map();
         auto input_node = pattern_map.at(unsqueeze_1).get_node_shared_ptr();
         auto weights_u32 = std::dynamic_pointer_cast<v0::Constant>(input_node->get_input_node_shared_ptr(0));
+        auto axis = std::dynamic_pointer_cast<v0::Constant>(input_node->get_input_node_shared_ptr(1));
+        auto axis_data = axis->get_data_ptr<uint32_t>();
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - axis: " << axis_data[0] << std::endl;
 
         auto u8_shape = weights_u32->get_shape();
         size_t full_size = shape_size(u8_shape);
         auto src = weights_u32->get_data_ptr<uint32_t>();
 
-        auto u4_shape = u8_shape;
-        u4_shape.push_back(8);
+        auto read_u4_data = [](const void *array, size_t index) {
+            auto arr_u32 = reinterpret_cast<const uint32_t*>(array);
+            size_t idx_u32 = index / 8;
+            size_t offset_u32 = index % 8;
+            uint32_t val = arr_u32[idx_u32];
+            val = val >> (offset_u32*4);
+            val = val & 15;
+            return val;
+        };
+        auto write_u4_data = [](void *array, size_t index, uint32_t data) {
+            auto arr_u32 = reinterpret_cast<uint32_t*>(array);
+            size_t idx_u32 = index / 8;
+            size_t offset_u32 = index % 8;
+            uint32_t old_val = arr_u32[idx_u32];
+            data = data << (offset_u32*4);
+            uint32_t mask = 15;
+            mask = ~(mask << (offset_u32*4));
+            uint32_t new_val = (old_val & mask) | data;
+            arr_u32[idx_u32] = new_val;
+        };
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - input_shape: " << u8_shape << std::endl;
+        //auto u4_shape = u8_shape;
+        //u4_shape.push_back(8);
+        ov::Shape u4_shape;
+        bool dim_added = false;
+        size_t stride = 1;
+        size_t size_y = 1;
+        for (int i=0; i<u8_shape.size(); i++) {
+            if (axis_data[0] == i) {
+                u4_shape.push_back(8);
+                dim_added = true;
+            }
+            if (axis_data[0] <= i) {
+                stride *= u8_shape[i];
+            } else {
+                size_y *= u8_shape[i];
+            }
+            u4_shape.push_back(u8_shape[i]);
+        }
+        if (!dim_added) {
+            u4_shape.push_back(8);
+        }
         auto new_const = std::make_shared<v0::Constant>(element::u4, u4_shape);
-        auto dst = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(new_const->get_data_ptr()));
+        auto dst = const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(new_const->get_data_ptr()));
 
-        std::copy(src, src + full_size, dst);  // TODO: Avoid copying, reuse the same constant
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - read_u4 - index: 0, val: " << std::hex << read_u4_data(src, 0) << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - read_u4 - index: 1, val: " << std::hex << read_u4_data(src, 1) << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - read_u4 - index: 2, val: " << std::hex << read_u4_data(src, 2) << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - read_u4 - index: 0+size_x, val: " << std::hex << read_u4_data(src, 512) << std::dec << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - read_u4 - index: 0+size_x*2, val: " << std::hex << read_u4_data(src, 2*512) << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - read_u4 - index: 0+size_x*3, val: " << std::hex << read_u4_data(src, 3*512) << std::dec << std::endl;
+
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - A - u4_shape: " << u4_shape << ", size_x: " << stride << ", size_y: " << size_y << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - B - src.shape: " << u8_shape << ", src.val[0]: " << std::hex << src[0] << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - B - src.shape: " << u8_shape << ", src.val[1]: " << std::hex << src[1] << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - B - src.shape: " << u8_shape << ", src.val[2]: " << std::hex << src[2] << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - B - src.shape: " << u8_shape << ", src.val[3]: " << std::hex << src[3] << std::dec << std::endl;
+
+        //size_t out_idx = 0;
+        //for (size_t y=0; y<size_y; y++) {
+        //    for (size_t x=0; x<(full_size*8)/size_y; x++) {
+        //        uint32_t val = read_u4_data(src, x*size_y+y);
+        //        write_u4_data(dst, out_idx++, val);
+        //    }
+        //}
+        size_t in_idx = 0;
+        for (size_t y=0; y<size_y; y++) {
+            size_t offset = y*stride*8;
+            for (size_t x=0; x<stride; x++) {
+                for (size_t z=0; z<8; z++) {
+                    uint32_t val = read_u4_data(src, in_idx);
+                    write_u4_data(dst, (offset+x+stride*z), val);
+                    in_idx++;
+                }
+            }
+        }
+
+        //for (size_t x=0; x<stride; x++) {
+        //    uint32_t mask = 15;
+        //    for (size_t y=0; y<8; y++) {
+        //        size_t val_count = 0;
+        //        size_t dst_index = 0;
+        //        for (size_t z=0; z<size_y; z++) {
+        //            uint32_t dst_value = 0;
+        //            uint32_t masked_value = src[x*size_y+z] & mask;
+        //            uint32_t shifted_value = masked_value << (val_count*4);
+        //            val_count = (val_count+1)%8;
+        //            if (val_count == 0) dst_index++;
+        //            dst[y*size_y+val_count] = shifted_value | dst[y*size_y+val_count];
+        //        }
+        //    }
+        //    mask = mask << 4;
+        //}
+        //std::copy(src, src + full_size, dst);  // TODO: Avoid copying, reuse the same constant
         copy_runtime_info_and_name(weights_u32, {new_const}, {weights_u32, bitwise_and, bitwise_right_shift});
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - C - dst.shape: " << u4_shape << ", dst.val[0]: " << std::hex << dst[0] << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - C - dst.shape: " << u4_shape << ", dst.val[1]: " << std::hex << dst[1] << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - C - dst.shape: " << u4_shape << ", dst.val[2]: " << std::hex << dst[2] << std::dec << std::endl;
+        //std::cout << "DEBUG - GPTQDecompressionReplacer - C - dst.shape: " << u4_shape << ", dst.val[3]: " << std::hex << dst[3] << std::dec << std::endl;
         //return new_const;
 
 

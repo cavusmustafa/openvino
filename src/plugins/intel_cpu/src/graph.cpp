@@ -1041,8 +1041,12 @@ void Graph::PullOutputData(BlobMap &out) {
     for (auto &outputMap : outputNodesMap) {
         auto name = outputMap.first;
         auto node = outputMap.second;
+        //std::cout << "DEBUG - PullOutputData - name: " << node->getName()
+        //          << ", type: " << node->getTypeStr() << std::endl;
         auto parentEdge = node->getParentEdgeAt(0);
         const auto& intr_blob = parentEdge->getMemory();
+        //std::cout << "DEBUG - PullOutputData - parent.name: " << parentEdge->getParent()->getName()
+        //          << ", type: " << parentEdge->getParent()->getTypeStr() << std::endl;
 
         const auto ext_blob_map = out.find(name);
         const auto ext_blob = ext_blob_map->second;
@@ -1114,7 +1118,13 @@ void Graph::PullOutputData(BlobMap &out) {
         } else {
             size_t size_to_copy = intr_blob.getDescWithType<BlockedMemoryDesc>()->getPaddedElementsCount();
 
+            //for (size_t i = 0; i < intr_blob.getSize(); i++) {
+            //    std::cout << "DEBUG - cpu_convert - A - prec: " << srcPrec << ", val[" << i << "]: "
+            //              //<< std::hex << (uint32_t)((reinterpret_cast<uint8_t*>(intr_blob_ptr))[i]) << std::dec << std::endl;
+            //              << (int32_t)((reinterpret_cast<int8_t*>(intr_blob_ptr))[i]) << std::endl;
+            //}
             cpu_convert(intr_blob_ptr, ext_blob_ptr, srcPrec, dstPrec, size_to_copy);
+            //std::cout << "DEBUG - cpu_convert - B" << std::endl;
         }
     }
 }
@@ -1122,14 +1132,17 @@ void Graph::PullOutputData(BlobMap &out) {
 void Graph::InferStatic(InferRequestBase* request) {
     dnnl::stream stream(getEngine());
 
+    //std::cout << "DEBUG - Graph::InferStatic - A" << std::endl;
     for (const auto& node : executableGraphNodes) {
         VERBOSE(node, getConfig().debugCaps.verbose);
         PERF(node, getConfig().collectPerfCounters);
 
         if (request)
             request->ThrowIfCanceled();
+        //std::cout << "DEBUG - Graph::InferStatic - ExecuteNode - type: " << node->getTypeStr() << std::endl;
         ExecuteNode(node, stream);
     }
+    //std::cout << "DEBUG - Graph::InferStatic - B" << std::endl;
 }
 
 namespace {
@@ -1367,8 +1380,10 @@ inline void Graph::ExecuteNode(const NodePtr& node, const dnnl::stream& stream) 
     OV_ITT_SCOPED_TASK(itt::domains::intel_cpu, node->profiling.execute);
     DEBUG_LOG(*node);
     if (node->isDynamicNode()) {
+        //std::cout << "\tDEBUG - Graph::ExecuteNode - Dynamic" << std::endl;
         node->executeDynamic(stream);
     } else {
+        //std::cout << "\tDEBUG - Graph::ExecuteNode - Static - type: " << node->getTypeStr() << std::endl;
         node->execute(stream);
     }
 }
@@ -1379,8 +1394,10 @@ void Graph::Infer(InferRequestBase* request) {
     }
 
     if (Status::ReadyDynamic == status) {
+        //std::cout << "DEBUG - Graph::Infer - Dynamic" << std::endl;
         InferDynamic(request);
     } else if (Status::ReadyStatic == status) {
+        //std::cout << "DEBUG - Graph::Infer - Static" << std::endl;
         InferStatic(request);
     } else {
         IE_THROW() << "Unknown ov::intel_cpu::Graph state: " << static_cast<size_t>(status);

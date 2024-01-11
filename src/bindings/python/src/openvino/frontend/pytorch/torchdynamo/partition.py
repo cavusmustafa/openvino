@@ -56,6 +56,47 @@ class Partitioner:
             return True
         return False
 
+    def filter_nodes(self, partitions: t.List[Partition]):
+        include_nodes = [#"pow_1",
+                         #"mean",
+                         #"add",
+                         #"rsqrt",
+                         #"mul",
+                         #"mul_1",
+                         #"view",
+                         "unsqueeze",
+                         "expand",
+                         "unsqueeze_1",
+                         "bitwise_right_shift",
+                         "_to_copy",
+                         "bitwise_and",
+                         "add_1",
+                         "view_1",
+
+                         #"view_2",
+                         "unsqueeze_2",
+                         "expand_1",
+                         "unsqueeze_3",
+                         "bitwise_right_shift_1",
+                         "_to_copy_1",
+                         "bitwise_and_1",
+                         "view_3",
+                         "sub",
+                         "mul_2"]
+                         #"view_4"]
+        for partition in partitions:
+            nodes_to_remove = []
+            for pnode in partition.nodes:
+                #print("DEBUG - filter_nodes - node.name: ", pnode.name, ", lookup")
+                if pnode.name in include_nodes:
+                    print("\tDEBUG - filter_nodes - node.name: ", pnode.name, ", found: yes")
+                else:
+                #    print("\tDEBUG - filter_nodes - node.name: ", pnode.name, ", found: no")
+                    nodes_to_remove.append(pnode)
+            for rm_node in nodes_to_remove:
+                partition.remove_node(rm_node)
+
+
     def make_partitions(self, graph_module: GraphModule) -> GraphModule:
         partitioner = CapabilityBasedPartitioner(
             graph_module, self.supported_ops, allows_single_node_partition=False)
@@ -65,10 +106,11 @@ class Partitioner:
         if os.getenv("OPENVINO_TORCH_MIN_NUM_NODES") is not None:
             min_num_nodes = int(os.getenv("OPENVINO_TORCH_MIN_NUM_NODES"))
         for part in partitions:
+            print("DEBUG - partitions - partition_size: ", len(part.nodes))
             if len(part.nodes) > min_num_nodes:
                 new_partitions.append(part)
+        #self.filter_nodes(new_partitions)
         self.add_get_attr_inputs(new_partitions)
         print("DEBUG - partitions - num_partitions: ", len(new_partitions))
         fused_graph_module = partitioner.fuse_partitions(new_partitions)
-
         return fused_graph_module

@@ -85,18 +85,15 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
     // unique for all new inlined inputs
     static size_t inlined_nodes_counter = 100000000;  // Suppose there are not graph with more than 10M nodes
 
-    std::cout << "DEBUG - FrontEnd - convert - A" << std::endl;
     std::shared_ptr<Model> resulting_model;  // define here to make a conversion in a nested scope
     {
         auto parameters = std::make_shared<ParameterVector>();
         auto tensor_map = std::make_shared<TensorMap>();  // tensor map of the current context
         auto mutated_tensors = std::make_shared<std::set<size_t>>();
 
-        std::cout << "DEBUG - FrontEnd - convert - B" << std::endl;
         if (input_model) {
             // When we have input model we should use its inputs order to create Parameters
             // We use m_inputs instead of get_inputs() because latter doesn't have "self" input
-        std::cout << "DEBUG - FrontEnd - convert - C" << std::endl;
             for (auto& input_p : input_model->m_inputs) {
                 auto pytorch_place = std::dynamic_pointer_cast<pytorch::Place>(input_p);
                 FRONT_END_GENERAL_CHECK(pytorch_place, "Only place produced by PyTorch Frontend is supported.");
@@ -114,9 +111,7 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
             for (auto& desc : input_model->m_descriptors) {
                 (*tensor_map)[desc.first] = desc.second.m_value;
             }
-        std::cout << "DEBUG - FrontEnd - convert - D" << std::endl;
         } else {
-        std::cout << "DEBUG - FrontEnd - convert - E" << std::endl;
             // Go over all pytorch_model inputs and register them in the tensor map:
             auto inputs = pytorch_model->inputs();
             for (size_t i = 0; i < inputs.size(); ++i) {
@@ -133,7 +128,6 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
                 parameters->push_back(parameter);
                 (*tensor_map)[inputs.at(i)] = parameter;
             }
-        std::cout << "DEBUG - FrontEnd - convert - F" << std::endl;
         }
 
         auto node_visitor = [&](std::shared_ptr<TorchDecoder> node) {
@@ -142,7 +136,6 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
             // link with external scope on a higher level.
 
             auto inlined_inputs = node->inlined_inputs(inlined_nodes_counter);
-            std::cout << "DEBUG - translate_session - convert_graph - inlined_inputs - size: " << inlined_inputs.size() << std::endl;
             for (size_t i = 0; i < inlined_inputs.size(); ++i) {
                 size_t fw_tensor_id = inlined_nodes_counter;
                 ++inlined_nodes_counter;  // TODO: Make sure that Decoder side use the same increment for producing ids
@@ -155,12 +148,8 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
             }
 
             auto raw_inputs = node->inputs();
-            std::cout << "DEBUG - translate_session - convert_graph - raw_inputs - size: " << raw_inputs.size() << std::endl;
             for (size_t i = 0; i < raw_inputs.size(); ++i) {
                 auto input = raw_inputs.at(i);
-                std::cout << "\tDEBUG - translate_session - convert_graph - raw_input - i: " << i << ", input_id: " << input << std::endl;
-                //auto const_val = node->const_input(i);
-                //std::cout << "\tDEBUG - translate_session - convert_graph - raw_input - val: " << const_val.as<ov::OutputVector>() << std::endl;
                 if (tensor_map->find(input) == tensor_map->end()) {
                     // Input refers value in the outer scope, need to create a new Parameter in the current scope
                     // Linkage to external scope will be performed on the level of the parent operation (if or loop)
@@ -171,7 +160,6 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
                     if (type.is<element::Type>()) {
                         dtype = type.as<element::Type>();
                     }
-                    std::cout << "\tDEBUG - translate_session - convert_graph - raw_input - i: " << i << ", shape: " << ps << ", type: " << dtype << std::endl;
                     auto parameter = std::make_shared<v0::Parameter>(dtype, ps);
                     (*tensor_map)[input] = parameter;
                     // set name of parameter to the index of node in the model
@@ -180,37 +168,35 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
                 }
             }
             auto context = NodeContext(node, external_tensor_map, tensor_map, parameters, mutated_tensors, this);
-            std::cout << "DEBUG - translate_session - convert_graph - op_type: " << context.get_op_type() << std::endl;
-
             // Add op type in the statistics
             m_op_statistics[context.get_op_type()]++;
             auto converted_outputs = convert_node(context);
  
-            if (context.get_op_type() == "aten.unsqueeze.default") {
-                std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - check" << std::endl;
-                auto node_shared_ptr = converted_outputs[0].get_node_shared_ptr();
-                if (node_shared_ptr) {
-                    std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - name: " << node_shared_ptr->get_name() << std::endl;
-                    auto input_ptr = node_shared_ptr->get_input_node_shared_ptr(0);
-                    if (input_ptr) {
-                        auto weights_orig = std::dynamic_pointer_cast<v0::Constant>(input_ptr);
-                        //if (weights_u8->get_output_element_type(0) != element::u8)
-                        if (weights_orig) {
-                            std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_type: "
-                                      << weights_orig->get_output_element_type(0) << std::endl;
-                            std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_shape: "
-                                      << weights_orig->get_shape() << std::endl;
-                            auto data_ptr = weights_orig->get_data_ptr<uint32_t>();
-                            for (size_t i=0; i<(weights_orig->get_byte_size()/sizeof(uint32_t)) && i<4; i++) {
-                                std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_val[" << i << "]: "
-                                          << std::hex << data_ptr[i] << std::dec << std::endl;
-                            }
-                        }
-                    }
-                } else {
-                    std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - invalid" << std::endl;
-                }
-            }
+            //if (context.get_op_type() == "aten.unsqueeze.default") {
+            //    std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - check" << std::endl;
+            //    auto node_shared_ptr = converted_outputs[0].get_node_shared_ptr();
+            //    if (node_shared_ptr) {
+            //        std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - name: " << node_shared_ptr->get_name() << std::endl;
+            //        auto input_ptr = node_shared_ptr->get_input_node_shared_ptr(0);
+            //        if (input_ptr) {
+            //            auto weights_orig = std::dynamic_pointer_cast<v0::Constant>(input_ptr);
+            //            //if (weights_u8->get_output_element_type(0) != element::u8)
+            //            if (weights_orig) {
+            //                std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_type: "
+            //                          << weights_orig->get_output_element_type(0) << std::endl;
+            //                std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_shape: "
+            //                          << weights_orig->get_shape() << std::endl;
+            //                auto data_ptr = weights_orig->get_data_ptr<uint32_t>();
+            //                for (size_t i=0; i<(weights_orig->get_byte_size()/sizeof(uint32_t)) && i<4; i++) {
+            //                    std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_val[" << i << "]: "
+            //                              << std::hex << data_ptr[i] << std::dec << std::endl;
+            //                }
+            //            }
+            //        }
+            //    } else {
+            //        std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - invalid" << std::endl;
+            //    }
+            //}
 
             auto fw_outputs = node->outputs();
             // Ops with subgraphs or with mutated inputs may have more outputs after conversion compared to pytorch ones
@@ -219,7 +205,6 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
                                           context.get_op_type(),
                                           " outputs greater then number of converted outputs.");
 
-        std::cout << "DEBUG - FrontEnd - convert - G - 6" << std::endl;
             for (size_t i = 0; i < fw_outputs.size(); ++i) {
                 size_t fw_tensor_id = node->output(i);
                 if (node->inputs().size() > 0 && node->may_produce_alias(0, i)) {
@@ -260,11 +245,9 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
             }
         };
 
-        std::cout << "DEBUG - FrontEnd - convert - H" << std::endl;
         FRONT_END_GENERAL_CHECK(pytorch_model->get_subgraph_size() == 1, "Model should have exactly 1 subgraph.");
         pytorch_model->visit_subgraph(node_visitor);
 
-        std::cout << "DEBUG - FrontEnd - convert - I" << std::endl;
         ResultVector results;
         if (input_model) {
             // For the case when we have InputModel we need to have same order as its outputs
@@ -334,7 +317,6 @@ OutputVector TranslateSession::convert_node(const NodeContext& context) {
     try {
         auto it = m_translator_map.find(context.get_op_type());
         if (it != m_translator_map.end()) {
-            //std::cout << "DEBUG - translate_session - convert_node - pass - op_type: " << context.get_op_type() << std::endl;
             return it->second(context);
         }
     } catch (std::exception& e) {
@@ -344,7 +326,6 @@ OutputVector TranslateSession::convert_node(const NodeContext& context) {
     }
     try {
         // Create PtFrameworkNode for everything that wasn't able to be converted normally
-        //std::cout << "DEBUG - translate_session - convert_node - fail - op_type: " << context.get_op_type() << std::endl;
         return make_framework_node(context, exception);
     } catch (std::exception& e) {
         exception += " Exception happened while creating FrameworkNode with subgraphs: " + std::string(e.what());

@@ -569,10 +569,13 @@ void cpu_convert(const void *srcPtr,
     if (srcPtr == nullptr || dstPtr == nullptr)
         IE_THROW() << "cpu_convert has null data pointer";
 
+    //std::cout << "DEBUG - cpu_convert - srcPrc: " << srcPrc << ", dstPrc: " << dstPrc << std::endl;
     if (srcPrc == dstPrc && srcPrc == interimPrc) {
+        //std::cout << "DEBUG - cpu_convert - A" << std::endl;
         const size_t L2_cache_size = dnnl::utils::get_cache_size(2, true);
         const size_t totalSize = size * dstPrc.size();
         if (totalSize >= L2_cache_size) {
+            //std::cout << "DEBUG - cpu_convert - A.1" << std::endl;
             auto src = static_cast<const uint8_t *>(srcPtr);
             auto dst = static_cast<uint8_t *>(dstPtr);
             parallel_nt(0, [&](const size_t ithr, const size_t nthr) {
@@ -581,9 +584,11 @@ void cpu_convert(const void *srcPtr,
                 cpu_memcpy(dst + start, src + start, end - start);
             });
         } else {
+            //std::cout << "DEBUG - cpu_convert - A.2" << std::endl;
             cpu_memcpy(dstPtr, srcPtr, size * dstPrc.size());
         }
     } else if (srcPrc == Precision::BIN) {
+        //std::cout << "DEBUG - cpu_convert - B" << std::endl;
         if (srcPrc.bitsSize() != 1)
             IE_THROW() << "cpu_convert can't convert from: " << srcPrc << " <bitsSize == " << srcPrc.bitsSize()
                 << "> precision to: " << dstPrc << ". Not implemented.";
@@ -598,6 +603,7 @@ void cpu_convert(const void *srcPtr,
             IE_THROW() << "cpu_convert can't convert from: " << srcPrc << " <bitsSize == " << srcPrc.bitsSize()
                                                              << "> precision to: " << dstPrc;
     } else {
+        //std::cout << "DEBUG - cpu_convert - C.0" << std::endl;
         ConvertContext ctx {
             srcPtr,
             dstPtr,
@@ -607,6 +613,7 @@ void cpu_convert(const void *srcPtr,
             false
         };
         OV_SWITCH(intel_cpu, ConvertPrecision, ctx, std::tie(srcPrc, dstPrc), INTEL_CPU_CVT_LIST);
+        //std::cout << "DEBUG - cpu_convert - error - 2" << std::endl;
         if (!ctx.converted)
             IE_THROW() << "cpu_convert can't convert from: " << srcPrc << " precision to: " << dstPrc;
     }

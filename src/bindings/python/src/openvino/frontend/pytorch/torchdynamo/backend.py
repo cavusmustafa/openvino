@@ -23,7 +23,8 @@ from openvino.frontend.pytorch.torchdynamo.execute import execute, execute_cache
 from openvino.frontend.pytorch.torchdynamo.compile import cached_model_name, cache_root_path, get_device, openvino_compile_cached_model
 
 from openvino.runtime import Core, Type, PartialShape
-from openvino.frontend.pytorch import gptq
+
+import time
 
 log = logging.getLogger(__name__)
 
@@ -115,19 +116,6 @@ def ts_openvino(subgraph, example_inputs):
 def fx_openvino(subgraph, example_inputs):
     #try:
     print("DEBUG - fx_openvino - A")
-    #if gptq.detect_gptq_model(subgraph.graph):
-        #print("DEBUG - fx_decoder - gptq - detected")
-        #try:
-        #    gptq.patch_model(pt_module)
-        #    gptq_patched = True
-        #except Exception as error:
-        #    print('[ WARNING ] Failed patching of AutoGPTQ model. Error message:\n', error)
-        #    print('[ WARNING ] Tracing of the model will likely be unsuccesfull or incorrect')
-        #    gptq.unpatch_model(pt_module)
-        #    gptq_patched = False
-    #else:
-        #print("DEBUG - fx_decoder - gptq - not_detected")
-    #gptq.patch_model(pt_module)
     
     executor_parameters = None
     inputs_reversed = False
@@ -166,8 +154,11 @@ def fx_openvino(subgraph, example_inputs):
 
     def _call(*args):
         print("DEBUG - fx_openvino - B")
+        time_s = time.time()
         res = execute(compiled_model, *args, executor="openvino",
                       executor_parameters=executor_parameters)
+        time_f = time.time()
+        print("DEBUG - fx_openvino - C - ex_time: ", (time_f-time_s))
         return res
     return _call
     #except Exception as e:

@@ -171,41 +171,41 @@ std::shared_ptr<QuantizedPtNode> cast_quantized_fw_node(std::shared_ptr<Node> no
 }
 
 std::shared_ptr<Node> u4_compression_stack(const OutputVector& list_elems, int64_t axis) {
-    std::cout << "DEBUG - u4_compression_stack - A" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - A" << std::endl;
     // Part 1: Detect pattern
 
     if (list_elems.size() != 2)
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - B" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - B" << std::endl;
     auto bitwise_and = cast_fw_node(list_elems[0].get_node_shared_ptr(), "aten::bitwise_and");
     if (!bitwise_and)
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - C" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - C" << std::endl;
     auto bitwise_shift = cast_fw_node(list_elems[1].get_node_shared_ptr(), "aten::bitwise_right_shift");
     if (!bitwise_shift)
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - D" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - D" << std::endl;
 
     auto weights_u8 = std::dynamic_pointer_cast<v0::Constant>(bitwise_and->get_input_node_shared_ptr(0));
     if (weights_u8 != std::dynamic_pointer_cast<v0::Constant>(bitwise_shift->get_input_node_shared_ptr(0)))
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - E" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - E" << std::endl;
 
     if (weights_u8->get_output_element_type(0) != element::u8)
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - F" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - F" << std::endl;
 
     if (axis != -1 && static_cast<uint64_t>(axis) != weights_u8->get_shape().size() - 1)
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - G" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - G" << std::endl;
 
     if (!ov::op::util::has_constant_value<uint64_t>(bitwise_and->get_input_node_shared_ptr(1), 0x0F))
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - H" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - H" << std::endl;
 
     if (!ov::op::util::has_constant_value<uint64_t>(bitwise_shift->get_input_node_shared_ptr(1), 4))
         return nullptr;
-    std::cout << "DEBUG - u4_compression_stack - I" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - I" << std::endl;
 
     // Pattern detected, weights_u8 is target u8 packed constant with weights
 
@@ -223,7 +223,7 @@ std::shared_ptr<Node> u4_compression_stack(const OutputVector& list_elems, int64
 
     std::copy(src, src + full_size, dst);  // TODO: Avoid copying, reuse the same constant
     copy_runtime_info_and_name(weights_u8, {new_const}, {weights_u8, bitwise_and, bitwise_shift});
-    std::cout << "DEBUG - u4_compression_stack - J" << std::endl;
+    //std::cout << "DEBUG - u4_compression_stack - J" << std::endl;
     return new_const;
 }
 
