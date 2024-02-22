@@ -479,6 +479,7 @@ int get_model_prefer_threads(const int num_streams,
             }
 #else
             bool llm_related = has_matmul_with_compressed_weights(model);
+            std::cout << "DEBUG - has_matmul_with_compressed_weights: " << llm_related << std::endl;
             bool int8_intensive = ov::op::util::has_op_with_type<ov::op::v0::FakeQuantize>(model) || llm_related;
             const int int8_threshold = 4;  // ~relative efficiency of the VNNI-intensive code for Big vs Little cores;
             const int fp32_threshold = 2;  // ~relative efficiency of the AVX2 fp32 code for Big vs Little cores;

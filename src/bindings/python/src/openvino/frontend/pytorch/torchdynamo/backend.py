@@ -25,6 +25,8 @@ from openvino.frontend.pytorch.torchdynamo.backend_utils import _get_cache_dir, 
 
 from openvino.runtime import Core, Type, PartialShape
 
+import time
+
 log = logging.getLogger(__name__)
 
 """
@@ -113,47 +115,56 @@ def ts_openvino(subgraph, example_inputs):
 
 
 def fx_openvino(subgraph, example_inputs, options):
-    try:
-        executor_parameters = None
-        inputs_reversed = False
-        openvino_model_caching = _get_model_caching(options)
-        if openvino_model_caching is not None and openvino_model_caching:
-            # Create a hash to be used for caching
-            model_hash_str = sha256(subgraph.code.encode('utf-8')).hexdigest()
-            executor_parameters = {"model_hash_str": model_hash_str}
-            # Check if the model was fully supported and already cached
-            example_inputs.reverse()
-            inputs_reversed = True
-            maybe_fs_cached_name = cached_model_name(model_hash_str + "_fs", _get_device(options), example_inputs, _get_cache_dir(options))
-            if os.path.isfile(maybe_fs_cached_name + ".xml") and os.path.isfile(maybe_fs_cached_name + ".bin"):
-                # Model is fully supported and already cached. Run the cached OV model directly.
-                compiled_model = openvino_compile_cached_model(maybe_fs_cached_name, options, *example_inputs)
-                def _call(*args):
-                    res = execute_cached(compiled_model, *args)
-                    return res
-                return _call
-        if inputs_reversed:
-            example_inputs.reverse()
-        model = make_fx(subgraph)(*example_inputs)
-        with torch.no_grad():
-            model.eval()
-        partitioner = Partitioner()
-        compiled_model = partitioner.make_partitions(model)
+    #try:
+    #print("DEBUG - fx_openvino - A")
+    executor_parameters = None
+    inputs_reversed = False
+    openvino_model_caching = _get_model_caching(options)
+    if openvino_model_caching is not None and openvino_model_caching:
+        # Create a hash to be used for caching
+        model_hash_str = sha256(subgraph.code.encode('utf-8')).hexdigest()
+        executor_parameters = {"model_hash_str": model_hash_str}
+        # Check if the model was fully supported and already cached
+        example_inputs.reverse()
+        inputs_reversed = True
+        maybe_fs_cached_name = cached_model_name(model_hash_str + "_fs", _get_device(options), example_inputs, _get_cache_dir(options))
+        if os.path.isfile(maybe_fs_cached_name + ".xml") and os.path.isfile(maybe_fs_cached_name + ".bin"):
+            # Model is fully supported and already cached. Run the cached OV model directly.
+            compiled_model = openvino_compile_cached_model(maybe_fs_cached_name, options, *example_inputs)
+            def _call(*args):
+                res = execute_cached(compiled_model, *args)
+                return res
+            return _call
+    if inputs_reversed:
+        example_inputs.reverse()
+    #print("DEBUG - fx_openvino - before make_fx - graph:")
+    #print(subgraph.code)
+    model = make_fx(subgraph)(*example_inputs)
+    #print("DEBUG - fx_openvino - after make_fx - graph:")
+    #print(model.code)
+    with torch.no_grad():
+        model.eval()
+    partitioner = Partitioner()
+    compiled_model = partitioner.make_partitions(model)
 
-        if executor_parameters is not None and 'model_hash_str' in executor_parameters:
-            # Check if the model is fully supported.
-            fully_supported = partitioner.check_fully_supported(compiled_model)
-            if fully_supported:
-                executor_parameters["model_hash_str"] += "_fs"
+    if executor_parameters is not None and 'model_hash_str' in executor_parameters:
+        # Check if the model is fully supported.
+        fully_supported = partitioner.check_fully_supported(compiled_model)
+        if fully_supported:
+            executor_parameters["model_hash_str"] += "_fs"
 
-        def _call(*args):
-            res = execute(compiled_model, *args, executor="openvino",
-                          executor_parameters=executor_parameters, options=options)
-            return res
-        return _call
-    except Exception as e:
-        log.debug(f"Failed in OpenVINO execution: {e}")
-        return compile_fx(subgraph, example_inputs)
+    def _call(*args):
+        #print("DEBUG - fx_openvino - B")
+        #time_s = time.time()
+        res = execute(compiled_model, *args, executor="openvino",
+                      executor_parameters=executor_parameters, options=options)
+        #time_f = time.time()
+        #print("DEBUG - fx_openvino - C - ex_time: ", (time_f-time_s))
+        return res
+    return _call
+    #except Exception as e:
+    #    log.debug(f"Failed in OpenVINO execution: {e}")
+    #    return compile_fx(subgraph, example_inputs)
 
 def reset():
     clear_caches()

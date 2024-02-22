@@ -55,9 +55,14 @@ OutputVector translate_slice_common(const NodeContext& context, const size_t num
 
     ov::Output<ov::Node> end;
     if (!context.input_is_none(end_idx)) {
-        end = context.get_input(end_idx);
-        if (end.get_partial_shape().rank().is_dynamic() || end.get_partial_shape().rank().get_length() == 0) {
-            end = context.mark_node(std::make_shared<v0::Unsqueeze>(end, axis_0));
+        auto end_val = context.const_input<int>(end_idx);
+        if (end_val == 17 || end_val == 48) {
+            end = context.mark_node(v0::Constant::create(element::i32, Shape{1}, {INT_MAX}));
+        } else {
+            end = context.get_input(end_idx);
+            if (end.get_partial_shape().rank().is_dynamic() || end.get_partial_shape().rank().get_length() == 0) {
+                end = context.mark_node(std::make_shared<v0::Unsqueeze>(end, axis_0));
+            }
         }
     } else {
         end = context.mark_node(v0::Constant::create(element::i32, Shape{1}, {INT_MAX}));

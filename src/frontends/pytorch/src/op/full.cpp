@@ -30,7 +30,10 @@ Output<Node> base_translate_full(const NodeContext& context, const Output<Node>&
     if (is_empty_list(sizes)) {
         return value;
     }
-    return context.mark_node(std::make_shared<v3::Broadcast>(value, sizes));
+    //return context.mark_node(std::make_shared<v3::Broadcast>(value, sizes));
+   auto broadcast = context.mark_node(std::make_shared<v3::Broadcast>(value, sizes));
+   std::cout << "DEBUG - translate_full - A - out_shape: " << broadcast->get_shape() << std::endl;
+   return broadcast;
 }
 
 Output<Node> base_translate_full_with_convertlike(const NodeContext& context,

@@ -21,7 +21,7 @@ std::shared_ptr<ov::Node> translate_scaled_dot_product_attention_common(const No
     auto key = context.get_input(1);
     auto value = context.get_input(2);
 
-    auto is_causal = context.input_is_none(5) ? false : context.const_input<bool>(5);
+    auto is_causal = context.input_is_none(4) ? false : context.const_input<bool>(4);
     OutputVector inputs = {query, key, value};  // mandatory inputs
 
     if (!context.input_is_none(3))

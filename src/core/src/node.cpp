@@ -714,13 +714,16 @@ bool ov::Node::constant_fold(OutputVector& output_values, const OutputVector& in
     if (is_const_fold_disabled()) {
         return false;
     }
+    //std::cout << "DEBUG - constant_folding - input - name: " << this->get_name() << ", type: " << this->get_type_name() << std::endl;
 
     // If all the inputs are constants, try to evaluate the outputs
     bool all_constants = std::all_of(input_values.begin(), input_values.end(), [](const Output<Node>& input) {
         return ov::as_type_ptr<ov::op::v0::Constant>(input.get_node_shared_ptr());
     });
-    if (!all_constants)
+    if (!all_constants) {
+        //std::cout << "DEBUG - constant_folding - false - 1" << std::endl;;
         return false;
+    }
 
     NodeVector nodes;
     TensorVector input_tensors;
@@ -730,6 +733,8 @@ bool ov::Node::constant_fold(OutputVector& output_values, const OutputVector& in
         void* data = (void*)constant->get_data_ptr();
         auto tensor = ov::Tensor(input.get_element_type(), input.get_shape(), data);
         input_tensors.push_back(tensor);
+        //std::cout << "\tDEBUG - constant_folding - input - type: " << input.get_element_type()
+        //          << ", shape: " << input.get_shape() << ", data: " << std::hex << (uint32_t)((reinterpret_cast<const uint8_t*>(data))[0]) << std::dec << std::endl;
     }
 
     TensorVector output_tensors;
@@ -746,9 +751,15 @@ bool ov::Node::constant_fold(OutputVector& output_values, const OutputVector& in
         for (size_t i = 0; i < output_tensors.size(); ++i) {
             output_values[i] = make_shared<ov::op::v0::Constant>(output_tensors[i]);
             ov::copy_runtime_info(nodes, output_values[i].get_node_shared_ptr());
+            //auto const_out = ov::as_type_ptr<ov::op::v0::Constant>(output_values[i].get_node_shared_ptr());
+            //std::cout << "\tDEBUG - constant_folding - output - type: " << output_values[i].get_element_type()
+            //          << ", shape: " << output_values[i].get_shape() << ", data: "
+            //          << std::hex << (uint32_t)((reinterpret_cast<const uint8_t*>(const_out->get_data_ptr()))[0]) << std::dec << std::endl;
         }
+	//std::cout << "DEBUG - constant_folding - true" << std::endl;;
         return true;
     }
+    //std::cout << "DEBUG - constant_folding - false - 2" << std::endl;;
     return false;
 }
 

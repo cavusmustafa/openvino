@@ -40,17 +40,20 @@ U4BlockRepack::U4BlockRepack() {
     register_matcher(
         std::make_shared<ov::pass::pattern::Matcher>(m_reshape2, "ov::frontend::pytorch::pass::U4BlockRepack"),
         [=](ov::pass::pattern::Matcher& m) {
+	    std::cout << "DEBUG - U4BlockRepack - A" << std::endl;
             auto& pattern_to_output = m.get_pattern_value_map();
             auto constant =
                 std::dynamic_pointer_cast<ov::op::v0::Constant>(pattern_to_output[m_constant].get_node_shared_ptr());
             if (!constant)
                 return false;
+	    std::cout << "DEBUG - U4BlockRepack - B" << std::endl;
             auto reshape1 = pattern_to_output[m_reshape1].get_node_shared_ptr();
             auto transpose = pattern_to_output[m_transpose].get_node_shared_ptr();
             auto reshape2 = pattern_to_output[m_reshape2].get_node_shared_ptr();
 
             if (constant->get_element_type() != element::u4)
                 return false;
+	    std::cout << "DEBUG - U4BlockRepack - C" << std::endl;
 
             // FIXME: Check reshape/transpose/reshape target shapes and axes permutation; now they are supposed to be
             // always in expected form
@@ -59,6 +62,7 @@ U4BlockRepack::U4BlockRepack() {
 
             if (source_shape.size() != 3)
                 return false;
+	    std::cout << "DEBUG - U4BlockRepack - D" << std::endl;
 
             auto destination_shape = reshape2->get_output_shape(0);
 
@@ -72,6 +76,7 @@ U4BlockRepack::U4BlockRepack() {
             auto new_const = std::make_shared<v0::Constant>(element::u4, destination_shape);
             auto dst = const_cast<uint8_t*>(                                   // const_cast?
                 reinterpret_cast<const uint8_t*>(new_const->get_data_ptr()));  // TODO: How to better accees u4 data?
+	    std::cout << "DEBUG - U4BlockRepack - E" << std::endl;
 
             for (size_t iblock = 0; iblock < n_blocks; ++iblock) {
                 auto src_block = src + iblock * block_size;
@@ -84,9 +89,11 @@ U4BlockRepack::U4BlockRepack() {
                     }
                 }
             }
+	    std::cout << "DEBUG - U4BlockRepack - F" << std::endl;
 
             copy_runtime_info({std::move(constant), std::move(reshape1), std::move(transpose), reshape2}, new_const);
             replace_node(reshape2, new_const);
+	    std::cout << "DEBUG - U4BlockRepack - G" << std::endl;
 
             return true;
         });

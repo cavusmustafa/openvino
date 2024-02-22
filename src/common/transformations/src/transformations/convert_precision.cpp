@@ -174,7 +174,9 @@ bool convert_node_output_precision(
     // Handle case with Constants as they can have consumers from other ov::Model object
     const auto constant = ov::as_type_ptr<opset10::Constant>(node);
     const auto it = const_to_internal_output.find(node.get());
+    //std::cout << "DEBUG - convert_node_output_precision - A - et: " << node->get_element_type() << std::endl;
     if (constant && it != const_to_internal_output.end()) {
+        //std::cout << "DEBUG - convert_node_output_precision - B" << std::endl;
         return fuse_type_to_constant(node, precisions, it->second);
     }
 
@@ -1192,6 +1194,8 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<opset4::Constan
     // Get source element type and source data
     auto src_type = constant->get_element_type();
     const auto* src_data = reinterpret_cast<const uint8_t*>(constant->get_data_ptr());
+    //std::cout << "DEBUG - convert_low_precisions_int - src.type: " << constant->get_element_type()
+    //          << ", src.data: " << std::hex << (uint32_t)(src_data[0]) << std::dec << std::endl;
 
     // We support conversion only if several elements can be represented in one instance of some
     // C++ common data type without any exception, destination data type should be bigger than
@@ -1222,9 +1226,12 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<opset4::Constan
     for (size_t i = 0; i < size; i++) {
         // Source type at the current moment always less than 1 byte
         // Select the right destination type
+	const uint8_t src_data_swapped = (src_data[src_idx] >> 4) | (src_data[src_idx] << 4);
         switch (to.size()) {
         case 1:
-            convert_lp_value<uint8_t, uint8_t>(src_data[src_idx],
+            //std::cout << "DEBUG - convert_low_precicions - case 1" << std::endl;
+            //convert_lp_value<uint8_t, uint8_t>(src_data[src_idx],
+            convert_lp_value<uint8_t, uint8_t>(src_data_swapped,
                                                dst_data[dst_idx],
                                                src_off,
                                                src_type.bitwidth(),
@@ -1283,6 +1290,13 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<opset4::Constan
         }
     }
 
+    //std::cout << "debug - convert_low_precisions_int - 0 - dst.type: " << new_constant->get_element_type()
+    //          << ", dst.data: " << std::hex << (uint32_t)(dst_data[0]) <<", src.data: " << (uint32_t)(src_data[0]) << std::dec << std::endl;
+    //std::cout << "debug - convert_low_precisions_int - 1 - dst.type: " << new_constant->get_element_type()
+    //          << ", dst.data: " << std::hex << (uint32_t)(dst_data[1]) <<", src.data: " << (uint32_t)(src_data[1])  << std::dec << std::endl;
+    //std::cout << "debug - convert_low_precisions_int - 2 - dst.type: " << new_constant->get_element_type()
+    //          << ", dst.data: " << std::hex << (uint32_t)(dst_data[2]) <<", src.data: " << (uint32_t)(src_data[2])  << std::dec << std::endl;
+
     return new_constant;
 }
 
@@ -1292,8 +1306,10 @@ bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
                            const precisions_map& precisions,
                            const std::vector<Input<Node>>& consumers) {
     // Consts marked with is_keep_const_precision should be kept in their own precision until they reach the plugin
+    //std::cout  << "DEBUG - fuse_type_to_constant - A" << std::endl;
     if (is_keep_const_precision(node))
         return false;
+    //std::cout  << "DEBUG - fuse_type_to_constant - B" << std::endl;
 
     auto from = node->get_element_type();
     auto it = precisions.find(from);

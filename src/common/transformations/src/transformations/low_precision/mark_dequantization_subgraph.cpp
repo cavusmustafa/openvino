@@ -33,21 +33,26 @@ ov::pass::MarkDequantizationSubgraph::MarkDequantizationSubgraph(const element::
     auto root = std::make_shared<pattern::op::Or>(OutputVector{multiply_pattern, multiply_no_subtract_pattern});
 
     ov::matcher_pass_callback callback = [=](pattern::Matcher& m) -> bool {
+	//std::cout << "DEBUG - MarkDequantizationSubgraph - A" << std::endl;
         const auto& pattern_map = m.get_pattern_value_map();
         auto convert = pattern_map.at(convert_pattern).get_node_shared_ptr();
         auto input = pattern_map.at(input_pattern);
         const auto multiply = m.get_match_root();
 
         if (transformation_callback(multiply)) {
+	    //std::cout << "DEBUG - MarkDequantizationSubgraph - B" << std::endl;
             return false;
         }
 
         auto subtract_it = pattern_map.find(subtract_pattern);
         if (subtract_it == pattern_map.end()) {
+	    //std::cout << "DEBUG - MarkDequantizationSubgraph - C.1" << std::endl;
             for (size_t i = 0; i < multiply->get_input_size(); i++) {
+	        //std::cout << "DEBUG - MarkDequantizationSubgraph - C.2" << std::endl;
                 const auto node = ov::as_type_ptr<opset10::Convert>(multiply->get_input_node_shared_ptr(i));
                 if (node && std::find(precisions.begin(), precisions.end(), node->get_input_element_type(0)) !=
                                 precisions.end()) {
+	            //std::cout << "DEBUG - MarkDequantizationSubgraph - C.3" << std::endl;
                     convert = node;
                     input = convert->input_value(0);
                 }
@@ -57,18 +62,25 @@ ov::pass::MarkDequantizationSubgraph::MarkDequantizationSubgraph(const element::
         const auto& input_precision = input.get_element_type();
         // validation by Convert operation input precisions
         if (std::find(precisions.begin(), precisions.end(), input_precision) == precisions.end()) {
+	    //std::cout << "DEBUG - MarkDequantizationSubgraph - D" << std::endl;
             return false;
         }
 
         if (ov::op::util::is_on_constant_path(input)) {
+	    //std::cout << "DEBUG - MarkDequantizationSubgraph - E.1" << std::endl;
             // disable ConstantFolding if dequantization subgraph is on constant data
             ov::disable_constant_folding(convert);
             // It is also necessary to avoid precision conversion for constant nodes with input_precision
             auto keep_const_precision = [&](Node* node) {
+	        //std::cout << "DEBUG - MarkDequantizationSubgraph - E.2" << std::endl;
                 if (auto constant = ov::as_type<ov::opset10::Constant>(node)) {
+	            //std::cout << "DEBUG - MarkDequantizationSubgraph - E.3" << std::endl;
                     const auto& const_et = constant->get_element_type();
-                    if (std::find(precisions.begin(), precisions.end(), const_et) != precisions.end())
+	            //std::cout << "DEBUG - MarkDequantizationSubgraph - E.4 - const_et: " << const_et << std::endl;
+                    if (std::find(precisions.begin(), precisions.end(), const_et) != precisions.end()) {
+	                //std::cout << "DEBUG - MarkDequantizationSubgraph - E.5" << std::endl;
                         ov::enable_keep_const_precision(convert->get_input_node_shared_ptr(0));
+		    }
                 }
             };
             std::unordered_set<Node*> visited;
@@ -76,12 +88,14 @@ ov::pass::MarkDequantizationSubgraph::MarkDequantizationSubgraph(const element::
         }
 
         if (subtract_it != pattern_map.end()) {
+	    //std::cout << "DEBUG - MarkDequantizationSubgraph - F.1" << std::endl;
             // mark Subtract as dequantization node
             ov::mark_as_dequantization_node(subtract_it->second.get_node_shared_ptr());
             auto zero_point = pattern_map.at(zero_point_pattern).get_node_shared_ptr();
             if (!fold_subtract_const && ov::is_type<opset10::Convert>(zero_point) &&
                 input_precision == zero_point->get_input_element_type(0) &&
                 ov::is_type<opset10::Constant>(zero_point->get_input_node_ptr(0))) {
+	        //std::cout << "DEBUG - MarkDequantizationSubgraph - F.2" << std::endl;
                 // disable ConstantFolding also for Convert on zero_point
                 // so we don't have to constantfold it and then convert it back to
                 // low precision in LP transformations
@@ -93,6 +107,7 @@ ov::pass::MarkDequantizationSubgraph::MarkDequantizationSubgraph(const element::
         // mark Multiply as dequantization node
         ov::mark_as_dequantization_node(multiply);
 
+	//std::cout << "DEBUG - MarkDequantizationSubgraph - G" << std::endl;
         return false;
     };
 

@@ -78,6 +78,7 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
     // unique for all new inlined inputs
     static size_t inlined_nodes_counter = 100000000;  // Suppose there are not graph with more than 10M nodes
 
+
     std::shared_ptr<Model> resulting_model;  // define here to make a conversion in a nested scope
     {
         auto parameters = std::make_shared<ParameterVector>();
@@ -164,6 +165,32 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
             // Add op type in the statistics
             m_op_statistics[context.get_op_type()]++;
             auto converted_outputs = convert_node(context);
+
+            //if (context.get_op_type() == "aten.unsqueeze.default") {
+            //    std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - check" << std::endl;
+            //    auto node_shared_ptr = converted_outputs[0].get_node_shared_ptr();
+            //    if (node_shared_ptr) {
+            //        std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - name: " << node_shared_ptr->get_name() << std::endl;
+            //        auto input_ptr = node_shared_ptr->get_input_node_shared_ptr(0);
+            //        if (input_ptr) {
+            //            auto weights_orig = std::dynamic_pointer_cast<v0::Constant>(input_ptr);
+            //            //if (weights_u8->get_output_element_type(0) != element::u8)
+            //            if (weights_orig) {
+            //                std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_type: "
+            //                          << weights_orig->get_output_element_type(0) << std::endl;
+            //                std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_shape: "
+            //                          << weights_orig->get_shape() << std::endl;
+            //                auto data_ptr = weights_orig->get_data_ptr<uint32_t>();
+            //                for (size_t i=0; i<(weights_orig->get_byte_size()/sizeof(uint32_t)) && i<4; i++) {
+            //                    std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - input_val[" << i << "]: "
+            //                              << std::hex << data_ptr[i] << std::dec << std::endl;
+            //                }
+            //            }
+            //        }
+            //    } else {
+            //        std::cout << "\tDEBUG - translate_session - convert_graph - unsqueeze - share_ptr - invalid" << std::endl;
+            //    }
+            //}
 
             auto fw_outputs = node->outputs();
             // Ops with subgraphs or with mutated inputs may have more outputs after conversion compared to pytorch ones
@@ -282,10 +309,12 @@ std::shared_ptr<Model> TranslateSession::convert_pytorch_model(
 OutputVector TranslateSession::convert_node(const NodeContext& context) {
     std::string exception;
     try {
+	//std::cout << "DEBUG - convert_node - A - type: " << context.get_op_type() << std::endl;
         auto it = m_translator_map.find(context.get_op_type());
         if (it != m_translator_map.end()) {
             return it->second(context);
         }
+	//std::cout << "DEBUG - convert_node - B - type: " << context.get_op_type() << std::endl;
     } catch (std::exception& e) {
         exception = e.what();
     } catch (...) {

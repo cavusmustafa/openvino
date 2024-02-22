@@ -4,7 +4,9 @@
 
 #include "openvino/frontend/pytorch/node_context.hpp"
 #include "openvino/op/concat.hpp"
+#include "openvino/op/constant.hpp"
 #include "openvino/op/convert.hpp"
+#include "openvino/op/gather.hpp"
 #include "openvino/op/gather_nd.hpp"
 #include "utils.hpp"
 
@@ -28,7 +30,8 @@ OutputVector translate_index_fx(const NodeContext& context) {
     }
     auto concat =
         context.mark_node(std::make_shared<ov::op::v0::Concat>(OutputVector(list_elems.begin(), list_elems.end()), 0));
-    auto gather = std::make_shared<ov::op::v8::GatherND>(x, concat);
+    auto axis_0 = context.mark_node(ov::op::v0::Constant::create(element::i32, Shape{}, {0}));
+    auto gather = context.mark_node(std::make_shared<ov::op::v8::Gather>(x, concat, axis_0));
     return {gather};
 };
 

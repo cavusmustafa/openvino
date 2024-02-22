@@ -180,6 +180,42 @@ void Convert::execute(dnnl::stream strm) {
     MemoryCPtr srcMemory = getParentEdgeAt(0)->getMemoryPtr();
     MemoryPtr dstMemory = getChildEdgeAt(0)->getMemoryPtr();
     execPtr->exec(srcMemory, dstMemory);
+
+    //std::cout << "\tDEBUG - Convert - src.type: " << srcMemory->getDesc().getPrecision()
+    //          << ", dst.type: " << dstMemory->getDesc().getPrecision() << std::endl;
+    //if (srcMemory->getDesc().getPrecision() == InferenceEngine::Precision::U8 &&
+    //    dstMemory->getDesc().getPrecision() == InferenceEngine::Precision::FP32) {
+    if (srcMemory->getDesc().getPrecision() == ov::element::Type_t::u8 &&
+        dstMemory->getDesc().getPrecision() == ov::element::Type_t::f32) {
+        for (size_t i = 0; i < srcMemory->getSize()/sizeof(int8_t); i++) {
+            auto val = (int32_t)((reinterpret_cast<int8_t*>(srcMemory->getData()))[i]);
+            (reinterpret_cast<float*>(dstMemory->getData()))[i] = static_cast<float>(val);
+        }
+    }
+    //std::cout << "\tDEBUG - Convert - src - type#: " << srcMemory->getDesc().getPrecision() << ", val[0]: "
+    //          << (int32_t)((reinterpret_cast<int#8_t*>(srcMemory->getData()))[0]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - dst - type#: " << dstMemory->getDesc().getPrecision() << ", val[0]: "
+    //          << ((reinterpret_cast<float*>(dstM#emory->getData()))[0]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - src - type#: " << srcMemory->getDesc().getPrecision() << ", val[1]: "
+    //          << (int32_t)((reinterpret_cast<int#8_t*>(srcMemory->getData()))[1]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - dst - type#: " << dstMemory->getDesc().getPrecision() << ", val[1]: "
+    //          << ((reinterpret_cast<float*>(dstM#emory->getData()))[1]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - src - type#: " << srcMemory->getDesc().getPrecision() << ", val[2]: "
+    //          << (int32_t)((reinterpret_cast<int#8_t*>(srcMemory->getData()))[2]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - dst - type#: " << dstMemory->getDesc().getPrecision() << ", val[2]: "
+    //          << ((reinterpret_cast<float*>(dstM#emory->getData()))[2]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - src - type: " << srcMemory->getDesc().getPrecision() << ", val[3]: "
+    //          << (int32_t)((reinterpret_cast<int8_t*>(srcMemory->getData()))[3]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - dst - type: " << dstMemory->getDesc().getPrecision() << ", val[3]: "
+    //          << ((reinterpret_cast<float*>(dstMemory->getData()))[3]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - src - type: " << srcMemory->getDesc().getPrecision() << ", val[4]: "
+    //          << (int32_t)((reinterpret_cast<int8_t*>(srcMemory->getData()))[4]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - dst - type: " << dstMemory->getDesc().getPrecision() << ", val[4]: "
+    //          << ((reinterpret_cast<float*>(dstMemory->getData()))[4]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - src - type: " << srcMemory->getDesc().getPrecision() << ", val[23]: "
+    //          << (int32_t)((reinterpret_cast<int8_t*>(srcMemory->getData()))[23]) << std::endl;
+    //std::cout << "\tDEBUG - Convert - dst - type: " << dstMemory->getDesc().getPrecision() << ", val[23]: "
+    //          << ((reinterpret_cast<float*>(dstMemory->getData()))[23]) << std::endl;
 }
 
 bool Convert::created() const {

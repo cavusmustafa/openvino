@@ -243,6 +243,12 @@ void FullyConnected::getSupportedDescriptors() {
     useMlas = !useSparseWeights && !useWeightsDecompressionImpl &&
               (inputDataType == memory::data_type::f32 && weightsDataType == memory::data_type::f32) &&
               fusedWith.empty();
+    //std::cout << "DEBUG - FC - useMlas(1): " << useMlas << std::endl;
+    //std::cout << "\tDEBUG - FC - useMlas - useSparseWeights: " << useSparseWeights
+    //          << ", useWeightsDecompressionImpl: " << useWeightsDecompressionImpl
+    //          << ", inputDataType: " << (inputDataType == memory::data_type::f32)
+    //          << ", weightsDataType: " << (weightsDataType == memory::data_type::f32)
+    //          << ", fusedWith.empty: " << fusedWith.empty() << std::endl;
     auto wgtDims = getInputShapeAtPort(WEIGHTS_ID).getStaticDims();
     // MLAS cannot support weight dims > 2, e.g. [1,64,9,9] * [10,64,9,9]
     if (useMlas && wgtDims.size() > 2) {
@@ -251,6 +257,7 @@ void FullyConnected::getSupportedDescriptors() {
             allOnes = allOnes && wgtDims[i] == 1;
         }
         useMlas = useMlas && allOnes;
+        //std::cout << "DEBUG - FC - useMlas(2): " << useMlas << std::endl;
     }
     if (useMlas && withBiases) {
         const auto& biasDims = getInputShapeAtPort(BIAS_ID).getStaticDims();
@@ -259,6 +266,7 @@ void FullyConnected::getSupportedDescriptors() {
             isByChannel = isByChannel && biasDims[i] == 1;
         }
         useMlas = useMlas && isByChannel;
+        //std::cout << "DEBUG - FC - useMlas(3): " << useMlas << std::endl;
     }
 #endif
 #ifdef CPU_DEBUG_CAPS
@@ -266,6 +274,7 @@ void FullyConnected::getSupportedDescriptors() {
     if (getenv("OV_CPU_FC_EXEC_TYPE")) {
         if (std::string(getenv("OV_CPU_FC_EXEC_TYPE")) != "MLAS") {
             useMlas = false;
+            //std::cout << "DEBUG - FC - useMlas(4): " << useMlas << std::endl;
         }
     }
 #endif
@@ -653,8 +662,10 @@ void FullyConnected::executeMLAS() {
 #endif
 
 void FullyConnected::execute(dnnl::stream strm) {
+    //std::cout << "DEBUG - FC - useConv1x1: " << useConv1x1 << std::endl;
 #ifdef OV_CPU_WITH_MLAS
     if (useMlas) {
+        //std::cout << "DEBUG - FC - useMlas" << std::endl;
         executeMLAS();
         return;
     }
@@ -670,10 +681,13 @@ void FullyConnected::execute(dnnl::stream strm) {
     auto updateMemoryPtr = [this](int argType) {
         auto param = primArgs.find(argType);
         if (param != primArgs.end()) {
+            //std::cout << "DEBUG - FC - updateMemoryPtr - 1" << std::endl;
             if (argType == DNNL_ARG_SRC && (getInputShapeAtPort(DATA_ID).getRank() > 2 || useConv1x1)) {
+                //std::cout << "DEBUG - FC - updateMemoryPtr - 2" << std::endl;
                 primArgs.at(argType).set_data_handle(getParentEdgesAtPort(0)[0]->getMemoryPtr()->getData());
             }
             if (argType == DNNL_ARG_DST && (getOutputShapeAtPort(0).getRank() > 2 || useConv1x1)) {
+                //std::cout << "DEBUG - FC - updateMemoryPtr - 3" << std::endl;
                 primArgs.at(argType).set_data_handle(getChildEdgesAtPort(0)[0]->getMemoryPtr()->getData());
             }
         }

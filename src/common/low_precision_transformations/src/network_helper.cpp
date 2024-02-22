@@ -1159,6 +1159,7 @@ FakeQuantizeDequantization NetworkHelper::getDequantization(const std::shared_pt
     const std::vector<ov::element::Type> defaultPrecisions,
     const size_t parentIndex,
     const bool inPlace) {
+    std::cout << "DEBUG - NetworkHelper - getDequantization - A" << std::endl;
     auto getDataIndex = [](const std::shared_ptr<ov::Node>& node) {
         if (ov::is_type<ov::opset1::Constant>(node->get_input_node_ptr(1))) {
             return 0ul;

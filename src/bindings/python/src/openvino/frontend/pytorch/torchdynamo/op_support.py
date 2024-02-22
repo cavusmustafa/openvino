@@ -37,12 +37,18 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.add.Tensor": None,
             "torch.ops.aten.add_.Tensor": None,
             "torch.ops.aten.addmm.default": None,
+            "torch.ops.aten.all.default": None,
+            "torch.ops.aten.any.default": None,
             "torch.ops.aten.arange.start": None,
+            "torch.ops.aten.arange.start_step": None,
             "torch.ops.aten.arange.default": None,
             "torch.ops.aten.argmax.default": None,
             "torch.ops.aten.avg_pool2d.default": None,
             "torch.ops.aten.baddbmm.default": None,
             "torch.ops.aten.bitwise_and.Tensor": None,
+            "torch.ops.aten.bitwise_and.Scalar": None,
+            "torch.ops.aten.bitwise_not.default": None,
+            "torch.ops.aten.bitwise_right_shift.Tensor": None,
             "torch.ops.aten.bmm.default": None,
             "torch.ops.aten.cat.default": None,
             "torch.ops.aten.clamp_min.default": None,
@@ -52,6 +58,7 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.cos.default": None,
             "torch.ops.aten.cumsum.default": None,
             "torch.ops.aten.detach.default": None,
+            "torch.ops.aten.detach_.default": None,
             "torch.ops.aten.div.Scalar": None,
             "torch.ops.aten.div.Tensor": None,
             "torch.ops.aten.embedding.default": None,
@@ -60,6 +67,7 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.eq.Tensor": None,
             "torch.ops.aten.exp.default": None,
             "torch.ops.aten.expand.default": None,
+            "torch.ops.aten.fill_.Tensor": None,
             "torch.ops.aten.full.default": None,
             "torch.ops.aten.gather.default": None,
             "torch.ops.aten.gelu.default": None,
@@ -68,12 +76,17 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.hardswish_.default": None,
             "torch.ops.aten.hardtanh_.default": None,
             "torch.ops.aten.index.Tensor": None,
+            "torch.ops.aten.isinf.default": None,
+            "torch.ops.aten.isnan.default": None,
+            "torch.ops.aten.le.Scalar": None,
             "torch.ops.aten.leaky_relu_.default": None,
             "torch.ops.aten.lift_fresh_copy.default": None,
             "torch.ops.aten.linalg_vector_norm.default": None,
             "torch.ops.aten.lt.Tensor": None,
             "torch.ops.aten.log.default": None,
+            "torch.ops.aten.logical_not.default": None,
             "torch.ops.aten.logsumexp.default": None,
+            "torch.ops.aten.masked_fill.Scalar": None,
             "torch.ops.aten.masked_fill_.Scalar": None,
             "torch.ops.aten.masked_fill.Tensor": None,
             "torch.ops.aten.max_pool2d_with_indices.default": None,
@@ -88,11 +101,17 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.native_layer_norm.default": None,
             "torch.ops.aten.neg.default": None,
             "torch.ops.aten.new_ones.default": None,
+            "torch.ops.aten.ones.default": None,
             "torch.ops.aten.permute.default": None,
+            "torch.ops.aten.pow.Scalar": None,
             "torch.ops.aten.pow.Tensor_Scalar": None,
+            "torch.ops.aten.pow.Tensor_Tensor": None,
+            "torch.ops.aten.reciprocal.default": None,
             "torch.ops.aten.relu.default": None,
             "torch.ops.aten.relu_.default": None,
+            "torch.ops.aten.rsqrt.default": None,
             "torch.ops.aten.rsub.Scalar": None,
+            "torch.ops.aten.scatter.src": None,
             "torch.ops.aten._scaled_dot_product_flash_attention.default": None,
             "torch.ops.aten.select.int": None,
             "torch.ops.aten.sigmoid.default": None,
@@ -100,12 +119,18 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.silu_.default": None,
             "torch.ops.aten.sin.default": None,
             "torch.ops.aten.slice.Tensor": None,
+            "torch.ops.aten.sort.default": None,
             "torch.ops.aten.split.Tensor": None,
+            "torch.ops.aten.split_with_sizes.default": None,
+            "torch.ops.aten.stack.default": None,
             "torch.ops.aten.sub.default": None,
             "torch.ops.aten.sub.Tensor": None,
             "torch.ops.aten.t.default": None,
             "torch.ops.aten.tanh.default": None,
+            "torch.ops.aten.topk.default": None,
             "torch.ops.aten.transpose.int": None,
+            "torch.ops.aten.tril.default": None,
+            "torch.ops.aten.tril_.default": None,
             "torch.ops.aten.unsqueeze.default": None,
             "torch.ops.aten.upsample_nearest2d.default": None,
             "torch.ops.aten.view.default": None,
@@ -118,6 +143,7 @@ class OperatorSupport(OperatorSupport):
     def is_node_supported(self, submodules: t.Mapping[str, Module], node: Node) -> bool:
         # OpenVINO FX subgraph should be purely functional
         if node.op not in CALLABLE_NODE_OPS:
+            #print("DEBUG - is_node_supported - target: ", node.target, ", supported: ", False)
             return False
 
         # ops in supported_dict doesn't have overload name
@@ -126,6 +152,10 @@ class OperatorSupport(OperatorSupport):
             target = _get_qualified_name(node.target.overloadpacket)
 
             if target in self._support_dict:
+                #print("DEBUG - is_node_supported - target: ", node.target, ", supported: ", True)
                 return True
 
-        return super().is_node_supported(submodules, node)
+        res = super().is_node_supported(submodules, node)
+        #print("DEBUG - is_node_supported - target: ", node.target, ", supported: ", res)
+        return res
+        #return super().is_node_supported(submodules, node)

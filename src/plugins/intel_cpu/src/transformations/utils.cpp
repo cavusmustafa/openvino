@@ -12,6 +12,7 @@ namespace ov {
 namespace intel_cpu {
 
 bool has_matmul_with_compressed_weights(const std::shared_ptr<const ov::Model>& model) {
+    std::cout << "DEBUG - has_matmul_with_compressed_weights - A" << std::endl;
     bool has_decompression_multiply = false;
     auto is_decompression_multiply = [&](ov::Node* node) {
         if (auto multiply = ov::as_type<ov::op::v1::Multiply>(node)) {
@@ -37,6 +38,7 @@ bool has_matmul_with_compressed_weights(const std::shared_ptr<const ov::Model>& 
         if (has_decompression_multiply)
             return true;
     }
+    std::cout << "DEBUG - has_matmul_with_compressed_weights - B" << std::endl;
     return false;
 }
 
