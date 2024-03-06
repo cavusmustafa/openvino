@@ -40,6 +40,7 @@ class TestLog(PytorchLayerTest):
 
     @pytest.mark.nightly
     @pytest.mark.precommit
+    @pytest.mark.precommit_fx_backend
     @pytest.mark.parametrize(("op", "input_dtype"),
                              [["log", "float32"], 
                              ["log", "int32"], 
