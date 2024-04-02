@@ -56,11 +56,94 @@ class Partitioner:
             return True
         return False
 
+    def filter_nodes(self, partitions: t.List[Partition]):
+        include_nodes = ["expand",
+                         "slice_2",
+                         "unsqueeze_1",
+                         "unsqueeze",
+                         "slice_1",
+            
+                         #"pow_1",
+                         #"mean",
+                         #"add",
+                         #"rsqrt",
+                         #"mul",
+                         #"mul_1",
+                         #"view",
+                         #"t",
+                         #"addmm",
+                         #"view_1",
+                         #"split_with_sizes",
+                         #"getitem",
+                         #"getitem_1",
+                         #"getitem_2",
+                         #"view_2",
+                         #"view_3",
+                         #"view_4",
+                         #"mul_2",
+                         #"slice_1",
+                         #"slice_2",
+                         #"slice_3",
+                         #"floordiv",
+                         #"view_5",
+                         #"view_6",
+                         #"select",
+                         #"select_1",
+                         #"mul_3",
+                         #"select_2",
+                         #"select_3",
+                         #"mul_4",
+                         #"sub",
+                         #"select_4",
+                         #"select_5",
+                         #"mul_5",
+                         #"select_6",
+                         #"select_7",
+                         #"mul_6",
+                         #"add_1",
+                         #"stack",
+                         #"mul_7",
+                         #"view_7",
+                         #"cat",
+                         ]
+        for partition in partitions:
+            nodes_to_remove = []
+            for pnode in partition.nodes:
+                print("DEBUG - filter_nodes - node.name: ", pnode.name, ", lookup")
+                if pnode.name in include_nodes:
+                    print("\tDEBUG - filter_nodes - node.name: ", pnode.name, ", found: yes")
+                    nodes_to_remove.append(pnode)
+                #else:
+                ##    print("\tDEBUG - filter_nodes - node.name: ", pnode.name, ", found: no")
+                #    nodes_to_remove.append(pnode)
+                #if "aten.view.default" in str(pnode.target):
+                #    print("\tDEBUG - filter_nodes - check_inputs - target: ", pnode.target, ", num_inputs: ", len(pnode.all_input_nodes))
+                #    for in_node in pnode.all_input_nodes:
+                #        print("\t\tDEBUG - filter_nodes - check_inputs - in_node: ", in_node.target)
+                #    if len(pnode.all_input_nodes) > 2:
+                #        nodes_to_remove.append(pnode)
+            for rm_node in nodes_to_remove:
+                partition.remove_node(rm_node)
+
     def make_partitions(self, graph_module: GraphModule, options) -> GraphModule:
         allow_single_node_partition = _is_testing(options)
         partitioner = CapabilityBasedPartitioner(
-            graph_module, self.supported_ops, allows_single_node_partition=allow_single_node_partition)
+            #graph_module, self.supported_ops, allows_single_node_partition=allow_single_node_partition)
+            graph_module, self.supported_ops, allows_single_node_partition=True)
         partitions = partitioner.propose_partitions()
+        print("DEBUG - Partition - num_parittions: ", len(partitions))
+        #if len(partitions) > 1:
+        #    partitions = []
+        #new_partitions = []
+        #min_num_nodes = 0
+        #import os
+        #if os.getenv("OPENVINO_TORCH_MIN_NUM_NODES") is not None:
+        #    min_num_nodes = int(os.getenv("OPENVINO_TORCH_MIN_NUM_NODES"))
+        #for part in partitions:
+        #    print("DEBUG - partitions - partition_size: ", len(part.nodes))
+        #    if len(part.nodes) > min_num_nodes:
+        #        new_partitions.append(part)
+        #self.filter_nodes(new_partitions)
         self.add_get_attr_inputs(partitions)
         fused_graph_module = partitioner.fuse_partitions(partitions)
 

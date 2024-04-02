@@ -134,7 +134,8 @@ class TorchFXPythonDecoder (Decoder):
         return self.inputs()[index]  # TODO: find specialized method
 
     def get_input_debug_name(self, index):
-        return "input"+str(index)
+        return str(self.get_input_type(index))
+        #return "input"+str(index)
 
     def get_input_signature_name(self, index: int) -> str:
         if self._input_signature is not None and index < len(self._input_signature):

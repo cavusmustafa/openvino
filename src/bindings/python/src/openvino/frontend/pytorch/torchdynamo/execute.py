@@ -27,10 +27,6 @@ from typing import Callable, Optional, Any
 
 from torch.fx.experimental.proxy_tensor import make_fx, wrapper_and_args_for_make_fx
 
-import logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
-
 
 DEFAULT_OPENVINO_PYTHON_CONFIG = MappingProxyType(
     {
@@ -96,9 +92,16 @@ def openvino_execute(gm: GraphModule, *args, executor_parameters=None, partition
         compiled_cache[partition_id] = compiled
 
     flat_args, _ = tree_flatten(args)
-    ov_inputs = [a.detach().cpu().numpy() for a in flat_args]
+    ov_inputs = [(a if isinstance(a, int) else a.detach().cpu().numpy()) for a in flat_args]
 
-    res = compiled(ov_inputs)
+    #res = compiled(ov_inputs)
+    req = compiled.create_infer_request()
+    res = req.infer(ov_inputs)
+
+    #pinfo = req.get_profiling_info()
+    #print("DEBUG - openvino_execute - pinfo - type: ", type(pinfo))
+    #for pc in pinfo:
+    #    print("\tDEBUG - openvino_execute - pc - type: ", pc.node_type, ", exec_type: ", pc.exec_type, ", name: ", pc.node_name, ", cpu_time: ", pc.cpu_time, ", real_time: ", pc.real_time, ", status: ", pc.status)
 
     results1 = [torch.from_numpy(res[out]) for out in compiled.outputs]
     if len(results1) == 1:
@@ -120,12 +123,16 @@ class OpenVINOGraphModule(torch.nn.Module):
         if self.perm_fallback:
             return self.gm(*args)
 
-        try:
-            result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id, options=self.options)
-        except Exception:
-            logger.warning("OpenVINO execution failed. Falling back to native PyTorch execution.")
-            self.perm_fallback = True
-            return self.gm(*args)
+        result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id, options=self.options)
+        #result =  self.gm(*args)
+        print("DEBUG - execute.py - finished")
+        #print("DEBUG - execute.py - result.type: ", type(result), ", sum: ", result.sum(), ", shape: ", result.shape)
+        #exit()
+        #try:
+        #    result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id, options=self.options)
+        #except Exception:
+        #    self.perm_fallback = True
+        #    return self.gm(*args)
 
         return result
 
@@ -162,11 +169,11 @@ def openvino_execute_partitioned(gm: GraphModule, *args, executor_parameters=Non
     model_hash_str = executor_parameters.get("model_hash_str", None)
 
     signature = str(id(gm))
-    for idx, input_data in enumerate(args):
-        if isinstance(input_data, torch.Tensor):
-            signature = signature + "_" + str(idx) + ":" + str(input_data.type())[6:] + ":" + str(input_data.size())[11:-1].replace(" ", "")
-        else:
-            signature = signature + "_" + str(idx) + ":" + type(input_data).__name__ + ":val(" + str(input_data) + ")"
+    #for idx, input_data in enumerate(args):
+    #    if isinstance(input_data, torch.Tensor):
+    #        signature = signature + "_" + str(idx) + ":" + str(input_data.type())[6:] + ":" + str(input_data.size())[11:-1].replace(" ", "")
+    #    else:
+    #        signature = signature + "_" + str(idx) + ":" + type(input_data).__name__ + ":val(" + str(input_data) + ")"
 
     if signature not in partitioned_modules:
         partitioned_modules[signature] = partition_graph(gm, use_python_fusion_cache=use_python_fusion_cache,

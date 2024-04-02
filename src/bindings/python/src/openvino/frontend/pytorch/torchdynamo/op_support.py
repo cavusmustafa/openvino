@@ -29,6 +29,8 @@ class OperatorSupport(OperatorSupport):
     def __init__(self, options):
         support_dict = {
             "_operator.getitem": None,
+            "_operator.mul": None,
+            "_operator.floordiv": None,
             "torch.ops.aten._adaptive_avg_pool1d.default": None,
             "torch.ops.aten._adaptive_avg_pool2d.default": None,
             "torch.ops.aten._adaptive_avg_pool3d.default": None,
@@ -185,7 +187,6 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.neg.default": None,
             "torch.ops.aten.new_full.default": None,
             "torch.ops.aten.new_ones.default": None,
-            "torch.ops.aten.ones_like.default": None,
             "torch.ops.aten.new_zeros.default": None,
             "torch.ops.aten.ones.default": None,
             "torch.ops.aten.permute.default": None,
@@ -225,6 +226,7 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.sub.Tensor": None,
             "torch.ops.aten.sum.default": None,
             "torch.ops.aten.sum.dim_IntList": None,
+            "torch.ops.aten.sym_size.int": None,
             "torch.ops.aten.t.default": None,
             "torch.ops.aten.tan.default": None,
             "torch.ops.aten.tanh.default": None,
@@ -240,7 +242,6 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.var_mean.correction": None,
             "torch.ops.aten.view.default": None,
             "torch.ops.aten.where.self": None,
-            "torch.ops.aten.zeros.default": None,
             "torch.ops.aten.zeros_like.default": None,
             "torch.ops.torchvision.deform_conv2d.default": None,
             "torch.ops.torchvision.roi_align.default": None,
@@ -254,6 +255,7 @@ class OperatorSupport(OperatorSupport):
     def is_node_supported(self, submodules: t.Mapping[str, Module], node: Node) -> bool:
         # OpenVINO FX subgraph should be purely functional
         if node.op not in CALLABLE_NODE_OPS:
+            print("DEBUG - is_node_supported - A - type: ", node.target, ", supported: ", False)
             return False
 
         # ops in supported_dict doesn't have overload name
@@ -264,4 +266,16 @@ class OperatorSupport(OperatorSupport):
             if target in self._support_dict:
                 return True
 
-        return super().is_node_supported(submodules, node)
+        out = super().is_node_supported(submodules, node)
+        #if "aten.expand.default" in str(node.target):
+        #    print("DEBUG - is_node_supported - A - check_expand - name: >", str(node.name).strip(), "<")
+        #    if (str(node.name).strip() == "expand"):
+        #        print("\tDEBUG - is_node_supported - A - check_expand - found")
+        #        out = False
+        #    out = False
+        #if "aten.view.default" in str(node.target) and len(node.all_input_nodes) > 2:
+        #    out = False
+        if not out:
+            print("DEBUG - is_node_supported - B - type: ->", node.target, "<-, supported: ", out)
+        return out
+        #return super().is_node_supported(submodules, node)
