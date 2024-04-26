@@ -96,6 +96,30 @@ OutputVector translate_reshape(const NodeContext& context) {
             auto reshape = std::make_shared<ov::op::v1::Reshape>(context.get_input(0), const_shape, false);
             return {context.mark_node(reshape)};
         }
+        if (in1_const[i] == 6) {
+            in1_const[i] = -1;
+            auto const_shape = context.mark_node(std::make_shared<ov::op::v0::Constant>(context.get_input(1).get_element_type(), context.get_input(1).get_shape(), in1_const));
+            auto reshape = std::make_shared<ov::op::v1::Reshape>(context.get_input(0), const_shape, false);
+            return {context.mark_node(reshape)};
+        }
+        if (in1_const[i] == 7) {
+            in1_const[i] = -1;
+            auto const_shape = context.mark_node(std::make_shared<ov::op::v0::Constant>(context.get_input(1).get_element_type(), context.get_input(1).get_shape(), in1_const));
+            auto reshape = std::make_shared<ov::op::v1::Reshape>(context.get_input(0), const_shape, false);
+            return {context.mark_node(reshape)};
+        }
+        if (in1_const[i] == 511) {
+            in1_const[i] = -1;
+            auto const_shape = context.mark_node(std::make_shared<ov::op::v0::Constant>(context.get_input(1).get_element_type(), context.get_input(1).get_shape(), in1_const));
+            auto reshape = std::make_shared<ov::op::v1::Reshape>(context.get_input(0), const_shape, false);
+            return {context.mark_node(reshape)};
+        }
+        if (in1_const[i] == 63) {
+            in1_const[i] = -1;
+            auto const_shape = context.mark_node(std::make_shared<ov::op::v0::Constant>(context.get_input(1).get_element_type(), context.get_input(1).get_shape(), in1_const));
+            auto reshape = std::make_shared<ov::op::v1::Reshape>(context.get_input(0), const_shape, false);
+            return {context.mark_node(reshape)};
+        }
     }
 
     auto reshape = std::make_shared<ov::op::v1::Reshape>(context.get_input(0), context.get_input(1), false);

@@ -117,6 +117,18 @@ OutputVector translate_expand_fx(const NodeContext& context) {
         if (sizes_const[i] == 144) {
             return {x};
         }
+        if (sizes_const[i] == 6) {
+            return {x};
+        }
+        if (sizes_const[i] == 7) {
+            return {x};
+        }
+        if (sizes_const[i] == 511) {
+            return {x};
+        }
+        if (sizes_const[i] == 63) {
+            return {x};
+        }
     }
     if (x.get_partial_shape().is_static() && x.get_shape() == sizes_const) {
         return {x};

@@ -126,12 +126,35 @@ std::shared_ptr<Model> FrontEnd::convert(const ov::frontend::InputModel::Ptr& mo
         TranslateSession translate_session(model, supported_ops, m_telemetry);
         converted_model = translate_session.get_converted_model();
     }
-
+    //for (auto node : converted_model->get_ops()) {
+    //    std::cout << "DEBUG - FrontEnd - converted_model - type: " << node->get_type_name() << ", name: " << node->get_name() << ", input_size: " << node->get_input_size() << std::endl;
+    //    auto fw_node = std::dynamic_pointer_cast<PtFrameworkNode>(node);
+    //    if (fw_node) {
+    //        std::cout << "\tDEBUG - FrontEnd - converted_model - fw_type: " << fw_node->get_op_type() << std::endl;
+    //    }
+    //    for (int i=0; i<node->get_input_size(); i++) {
+    //        std::cout << "\tDEBUG - FrontEnd - converted_model - input - i: " << i << ", type: " << node->get_input_node_shared_ptr(i)->get_type_name()
+    //                  << ", name: " << node->get_input_node_shared_ptr(i)->get_name() << ", input_shape: " << node->get_input_partial_shape(i)
+    //                  << ", input_type: " << node->get_input_element_type(i) << std::endl;
+    //    }
+    //}
     std::string norm_err;
     try {
         normalize(converted_model);
     } catch (const std::exception& e) {
         norm_err = "\n-- normalize step failed with: " + std::string(e.what());
+    }
+    for (auto node : converted_model->get_ops()) {
+        std::cout << "DEBUG - FrontEnd - converted_model - type: " << node->get_type_name() << ", name: " << node->get_name() << ", input_size: " << node->get_input_size() << std::endl;
+        auto fw_node = std::dynamic_pointer_cast<PtFrameworkNode>(node);
+        if (fw_node) {
+            std::cout << "\tDEBUG - FrontEnd - converted_model - fw_type: " << fw_node->get_op_type() << std::endl;
+        }
+        for (int i=0; i<node->get_input_size(); i++) {
+            std::cout << "\tDEBUG - FrontEnd - converted_model - input - i: " << i << ", type: " << node->get_input_node_shared_ptr(i)->get_type_name()
+                      << ", name: " << node->get_input_node_shared_ptr(i)->get_name() << ", input_shape: " << node->get_input_partial_shape(i)
+                      << ", input_type: " << node->get_input_element_type(i) << std::endl;
+        }
     }
 
     const auto& unconverted_ops = get_unconverted_types_from_model(converted_model);

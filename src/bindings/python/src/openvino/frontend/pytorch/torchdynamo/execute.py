@@ -27,6 +27,8 @@ from typing import Callable, Optional, Any
 
 from torch.fx.experimental.proxy_tensor import make_fx, wrapper_and_args_for_make_fx
 
+import ml_dtypes
+import time
 
 DEFAULT_OPENVINO_PYTHON_CONFIG = MappingProxyType(
     {
@@ -36,6 +38,7 @@ DEFAULT_OPENVINO_PYTHON_CONFIG = MappingProxyType(
 )
 
 compiled_cache = {}
+req_cache = {}
 max_openvino_partitions = 0
 partitioned_modules = {}
 
@@ -85,18 +88,30 @@ def openvino_execute(gm: GraphModule, *args, executor_parameters=None, partition
         if not fully_supported:
             model_hash_str = model_hash_str + "_p" + str(partition_id)
 
+    #flat_args, _ = tree_flatten(args)
+    #args_bf16 = [a.detach().cpu().numpy().astype(ml_dtypes.bfloat16) for a in flat_args]
+    #args_bf16 = [a.to(torch.bfloat16) for a in flat_args]
     if use_cache and (partition_id in compiled_cache):
         compiled = compiled_cache[partition_id]
+        req = req_cache[partition_id]
     else:
         compiled = openvino_compile(gm, *args, model_hash_str=model_hash_str, options=options)
+        #compiled = openvino_compile(gm, *args_bf16, model_hash_str=model_hash_str, options=options)
         compiled_cache[partition_id] = compiled
+        req = compiled.create_infer_request()
+        req_cache[partition_id] = req
 
     flat_args, _ = tree_flatten(args)
     ov_inputs = [(a if isinstance(a, int) else a.detach().cpu().numpy()) for a in flat_args]
+    #ov_inputs = [a.detach().cpu().numpy().astype(ml_dtypes.bfloat16) for a in flat_args]
+    #ov_inputs = [(a if isinstance(a, int) else a.detach().cpu().numpy()) for a in args_bf16]
 
     #res = compiled(ov_inputs)
-    req = compiled.create_infer_request()
-    res = req.infer(ov_inputs)
+    #req = compiled.create_infer_request()
+    time_1 = time.time()
+    res = req.infer(ov_inputs, share_inputs=True, share_outputs=True)
+    time_2 = time.time()
+    print("DEBUG - openvino_execute - time: ", (time_2-time_1))
 
     #pinfo = req.get_profiling_info()
     #print("DEBUG - openvino_execute - pinfo - type: ", type(pinfo))
@@ -125,7 +140,7 @@ class OpenVINOGraphModule(torch.nn.Module):
 
         result = openvino_execute(self.gm, *args, executor_parameters=self.executor_parameters, partition_id=self.partition_id, options=self.options)
         #result =  self.gm(*args)
-        print("DEBUG - execute.py - finished")
+        #print("DEBUG - execute.py - finished")
         #print("DEBUG - execute.py - result.type: ", type(result), ", sum: ", result.sum(), ", shape: ", result.shape)
         #exit()
         #try:

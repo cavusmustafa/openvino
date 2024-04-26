@@ -28,6 +28,8 @@ from openvino.frontend.pytorch.torchdynamo.backend_utils import _get_cache_dir, 
 
 from openvino.runtime import Core, Type, PartialShape
 
+import time
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
@@ -169,9 +171,12 @@ def fx_openvino(subgraph, example_inputs, options=None):
             executor_parameters["model_hash_str"] += "_fs"
 
     def _call(*args):
-        print("DEBUG - fx_openvino - B")
+        #print("DEBUG - fx_openvino - B")
+        time_1 = time.time()
         res = execute(compiled_model, *args, executor="openvino",
                       executor_parameters=executor_parameters, options=options)
+        time_2 = time.time()
+        print("DEBUG - fx_openvino - B - time: ", (time_2-time_1))
         return res
     return _call
     #except Exception as e:
