@@ -273,6 +273,7 @@ class OperatorSupport(OperatorSupport):
     def is_node_supported(self, submodules: t.Mapping[str, Module], node: Node) -> bool:
         # OpenVINO FX subgraph should be purely functional
         if node.op not in CALLABLE_NODE_OPS:
+            print("DEBUG - Checking for op support - type: ", node.target, ", is_op_supported: ", False)
             return False
 
         # ops in supported_dict doesn't have overload name
@@ -281,9 +282,13 @@ class OperatorSupport(OperatorSupport):
             target = _get_qualified_name(node.target.overloadpacket)
 
             if target in self._support_dict:
+                print("DEBUG - Checking for op support - type: ", node.target, ", is_op_supported: ", True)
                 return True
 
         if node.name in self.enabled_op_names:
+            print("DEBUG - Checking for op support - type: ", node.target, ", is_op_supported: ", True)
             return True
 
-        return super().is_node_supported(submodules, node)
+        res = super().is_node_supported(submodules, node)
+        print("DEBUG - Checking for op support - type: ", node.target, ", is_op_supported: ", res)
+        return res

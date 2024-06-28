@@ -112,6 +112,9 @@ class Partitioner:
         partitioner = CapabilityBasedPartitioner(
             graph_module, self.supported_ops, allows_single_node_partition=allow_single_node_partition)
         partitions = partitioner.propose_partitions()
+        print("DEBUG: Number of partitions: ", len(partitions))
+        for part in partitions:
+            print("\tDEBUG: partitions size: ", part.size())
         self.add_get_attr_inputs(partitions)
         fused_graph_module = partitioner.fuse_partitions(partitions)
 
