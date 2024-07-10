@@ -106,6 +106,12 @@ def openvino_execute(gm: GraphModule, *args, executor_parameters=None, partition
 
     res = req.infer(ov_inputs, share_inputs=True, share_outputs=True)
 
+    pinfo = req.get_profiling_info()
+    print("DEBUG - openvino_execute - pinfo - type: ", type(pinfo))
+    for pc in pinfo:
+        print("\tDEBUG - openvino_execute - pc - type: ", pc.node_type, ", exec_type: ", pc.exec_type, ", name: ", pc.node_name, ", cpu_time: ", pc.cpu_time, ", real_time: ", pc.real_time, ", status: ", pc.status)
+
+
     results1 = [torch.from_numpy(res[out]) for out in compiled.outputs]
     if len(results1) == 1:
         return results1[0]
