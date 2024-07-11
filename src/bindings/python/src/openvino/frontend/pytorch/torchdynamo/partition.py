@@ -106,12 +106,28 @@ class Partitioner:
                 self.supported_ops.enable_by_name(unsqueeze_0_node)
                 self.supported_ops.enable_by_name(unsqueeze_1_node)
 
+    def filter_nodes(self, partitions: t.List[Partition]):
+        include_nodes = ["expand",
+                         ]
+        for partition in partitions:
+            nodes_to_remove = []
+            for pnode in partition.nodes:
+                if pnode.name not in include_nodes:
+                    nodes_to_remove.append(pnode)
+            for rm_node in nodes_to_remove:
+                partition.remove_node(rm_node)
+
     def make_partitions(self, graph_module: GraphModule, options) -> GraphModule:
-        allow_single_node_partition = _is_testing(options)
+        #allow_single_node_partition = _is_testing(options)
+        allow_single_node_partition = True
         self.capture_gptq_patterns(graph_module)
         partitioner = CapabilityBasedPartitioner(
             graph_module, self.supported_ops, allows_single_node_partition=allow_single_node_partition)
         partitions = partitioner.propose_partitions()
+        self.filter_nodes(partitions)
+        print("DEBUG - num_partitions: ", len(partitions))
+        for part in partitions:
+            print("\tDEBUG - partition - size: ", part.size())
         self.add_get_attr_inputs(partitions)
         fused_graph_module = partitioner.fuse_partitions(partitions)
 

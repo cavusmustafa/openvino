@@ -97,6 +97,8 @@ def fx_openvino(subgraph, example_inputs, options=None):
             with torch.no_grad():
                 model.eval()
 
+        print(model.code)
+
         partitioner = Partitioner(options)
         compiled_model = partitioner.make_partitions(model, options)
 
