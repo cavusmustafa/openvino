@@ -16,6 +16,7 @@
 #include "nodes/ctc_greedy_decoder_seq_len.h"
 #include "nodes/ctc_loss.h"
 #include "nodes/cum_sum.h"
+#include "nodes/custom_op_test.h"
 #include "nodes/deconv.h"
 #include "nodes/def_conv.h"
 #include "nodes/depth_to_space.h"
@@ -112,6 +113,7 @@ Node::NodesFactory::NodesFactory() : Factory("NodesFactory") {
     using namespace node;
     INTEL_CPU_NODE(CumSum, Type::CumSum);
     INTEL_CPU_NODE(Convolution, Type::Convolution);
+    INTEL_CPU_NODE(CustomOpTest, Type::CustomOpTest);
     INTEL_CPU_NODE(BinaryConvolution, Type::BinaryConvolution);
     INTEL_CPU_NODE(SpaceToBatch, Type::SpaceToBatch);
     INTEL_CPU_NODE(Lrn, Type::Lrn);

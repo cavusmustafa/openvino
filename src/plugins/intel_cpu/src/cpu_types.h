@@ -26,6 +26,7 @@ enum class Type {
     Output,
     Eye,
     Convolution,
+    CustomOpTest,
     Deconvolution,
     Lrn,
     Pooling,

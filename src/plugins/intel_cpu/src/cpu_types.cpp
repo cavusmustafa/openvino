@@ -100,6 +100,7 @@ static const TypeToNameMap& get_type_to_name_tbl() {
         {"ShapeOf", Type::ShapeOf},
         {"NonZero", Type::NonZero},
         {"Softmax", Type::Softmax},
+        {"CustomOpTest", Type::CustomOpTest},
         {"Reorder", Type::Reorder},
         {"BatchToSpace", Type::BatchToSpace},
         {"SpaceToBatch", Type::SpaceToBatch},
@@ -278,6 +279,7 @@ std::string NameFromType(const Type type) {
         CASE(FullyConnected);
         CASE(MatMul);
         CASE(Softmax);
+        CASE(CustomOpTest);
         CASE(Split);
         CASE(Concatenation);
         CASE(StridedSlice);

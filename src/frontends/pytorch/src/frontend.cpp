@@ -45,6 +45,7 @@
 #include "transforms/softmax_reshape_elimination.hpp"
 #include "transforms/string_equality_replacer.hpp"
 #include "transforms/torchfx_gptq_pattern_replacer.hpp"
+#include "transforms/torchfx_custom_op_test_replacer.hpp"
 #include "transforms/tuple_unpack_replacer.hpp"
 #include "transforms/u4_block_repack.hpp"
 #include "translate_session.hpp"
@@ -241,6 +242,8 @@ std::shared_ptr<Model> FrontEnd::decode(const InputModel::Ptr& model) const {
 
 void FrontEnd::normalize(const std::shared_ptr<ov::Model>& model) const {
     ov::pass::Manager manager;
+
+    manager.register_pass<ov::frontend::pytorch::pass::CustomOpTestReplacer>();
 
     // GPTQ transformations need to be executed before other passes
     // Once the GPTQ patterns are modified by other transformations,

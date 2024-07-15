@@ -38,6 +38,7 @@
 #include "openvino/op/convolution.hpp"
 #include "openvino/op/cos.hpp"
 #include "openvino/op/cosh.hpp"
+#include "openvino/op/custom_op_test.hpp"
 #include "openvino/op/ctc_greedy_decoder.hpp"
 #include "openvino/op/ctc_greedy_decoder_seq_len.hpp"
 #include "openvino/op/ctc_loss.hpp"
