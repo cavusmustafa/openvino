@@ -114,6 +114,7 @@ def openvino_compile(gm: GraphModule, *args, model_hash_str: str = None, options
         torch.float32: Type.f32,
         torch.float64: Type.f64,
         torch.float16: Type.f16,
+        torch.bfloat16: Type.bf16,
         torch.int64: Type.i64,
         torch.int32: Type.i32,
         torch.uint8: Type.u8,

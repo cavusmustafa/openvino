@@ -18,6 +18,41 @@ void regclass_Tensor(py::module m) {
     py::class_<ov::Tensor, std::shared_ptr<ov::Tensor>> cls(m, "Tensor");
     cls.doc() = "openvino.runtime.Tensor holding either copy of memory or shared host memory.";
 
+    cls.def(py::init([](int64_t data_ptr, const ov::Shape& shape, const ov::element::Type& ov_type) {
+                return Common::tensor_from_pointer(data_ptr, shape, ov_type);
+            }),
+            py::arg("data_ptr"),
+            py::arg("shape"),
+            py::arg("type") = ov::element::undefined,
+            R"(
+                Another Tensor's special constructor.
+
+                Represents array in the memory with given shape and element type.
+                It's recommended to use this constructor only for wrapping array's
+                memory with the specific openvino element type parameter.
+
+                :param array: C_CONTIGUOUS numpy array which will be wrapped in
+                              openvino.runtime.Tensor with given parameters (shape
+                              and element_type). Array's memory is being shared with
+                              a host, that means the responsibility of keeping host memory is
+                              on the side of a user. Any action performed on the host
+                              memory will be reflected on this Tensor's memory!
+                :type data_ptr: data_ptr
+                :param shape: Shape of the new tensor.
+                :type shape: openvino.runtime.Shape
+                :param type: Element type
+                :type type: openvino.runtime.Type
+
+                :Example:
+                .. code-block:: python
+
+                    import openvino.runtime as ov
+                    import numpy as np
+
+                    arr = np.array(shape=(100), dtype=np.uint8)
+                    t = ov.Tensor(arr, ov.Shape([100, 8]), ov.Type.u1)
+            )");
+
     cls.def(py::init([](py::array& array, bool shared_memory) {
                 return Common::object_from_data<ov::Tensor>(array, shared_memory);
             }),
