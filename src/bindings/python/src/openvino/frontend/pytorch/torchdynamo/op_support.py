@@ -28,6 +28,16 @@ class OperatorSupport(OperatorSupport):
 
     def __init__(self, options):
         support_dict = {
+            #"torch.ops._assert_scalar.default": None,
+            #"torch.ops.sym_constrain_range_for_size.default": None,
+            #"torch.ops.sym_size.int": None,
+            #"torch.ops._local_scalar_dense.default": None,
+            #"torch.ops.add": None,
+            #"torch.ops.ge": None,
+            #"torch.ops.le": None,
+            "torch.ops.aten.logical_and.default": None,
+            "torch.ops.lt": None,
+            "torch.ops.scalar_tensor.default": None,
             "_operator.add": None,
             "_operator.floordiv": None,
             "_operator.getitem": None,
@@ -216,7 +226,7 @@ class OperatorSupport(OperatorSupport):
             "torch.ops.aten.scatter.src": None,
             "torch.ops.aten.scatter.value": None,
             "torch.ops.aten.select.int": None,
-            "torch.ops.aten.select_copy.int": None,
+            #"torch.ops.aten.select_copy.int": None,
             "torch.ops.aten.select_scatter.default": None,
             "torch.ops.aten.sigmoid.default": None,
             "torch.ops.aten.sigmoid_.default": None,

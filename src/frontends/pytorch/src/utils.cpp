@@ -628,7 +628,8 @@ std::deque<Output<Node>> get_list_as_outputs(const Output<Node>& start, bool uns
         auto inputs = list_construct->inputs();
         for (auto input_it = inputs.rbegin(); input_it != inputs.rend(); ++input_it) {
             auto elem = input_it->get_source_output();
-            if (unsqueeze_for_concat) {
+            //std::cout << "DEBUG - get_list_as_outputs - elem - partial_shape: " << elem.get_partial_shape() << ", dynamic: " << (elem.get_partial_shape().is_dynamic()?"true":"false") << std::endl;
+            if (unsqueeze_for_concat && !(elem.get_partial_shape().is_dynamic())) {
                 elem = std::make_shared<v0::Unsqueeze>(elem, zero);
             }
             res.push_front(elem);

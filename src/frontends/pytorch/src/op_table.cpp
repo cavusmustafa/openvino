@@ -761,6 +761,15 @@ const std::unordered_map<std::string, CreatorFunction> get_supported_ops_ts() {
 
 const std::unordered_map<std::string, CreatorFunction> get_supported_ops_fx() {
     return {
+        {"_assert_scalar.default", op::skip_node},
+        {"sym_constrain_range_for_size.default", op::skip_node},
+        {"_local_scalar_dense.default", op::skip_node},
+        {"add", op::translate_add},
+        {"<built-in function ge>", op::translate_1to1_match_2_inputs_align_types<opset10::GreaterEqual>},
+        {"<built-in function le>", op::translate_1to1_match_2_inputs_align_types<opset10::LessEqual>},
+        {"lt", op::translate_1to1_match_2_inputs_align_types<opset10::Less>},
+        {"scalar_tensor.default", op::translate_scalar_tensor_fx},
+        {"sym_size.int", op::translate_size},
         {"<built-in function add>", op::translate_add},
         {"<built-in function floordiv>", op::translate_floor_divide},
         {"<built-in function getitem>", op::translate_getitem},  // TODO: Check if there is any other way to handle this
