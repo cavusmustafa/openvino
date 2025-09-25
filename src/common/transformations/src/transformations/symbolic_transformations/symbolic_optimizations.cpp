@@ -194,7 +194,7 @@ ov::pass::SymbolicOptimizations::SymbolicOptimizations(bool full_run,
     // transformations which use symbols for optimizations
     REGISTER_SYMBOLIC(ApplySymbolEquivalence)
     if (full_run) {
-        REGISTER_SYMBOLIC(OptimizeSymbolsUsedAsValues)  // reduce shape sub-graphs
+        //REGISTER_SYMBOLIC(OptimizeSymbolsUsedAsValues)  // reduce shape sub-graphs
         REGISTER_SYMBOLIC(LabelResolvingThroughSelect)  // figures out that broadcasting didn't happen through Select op
         REGISTER_SYMBOLIC(DeReshapeMatMul)
         REGISTER_SYMBOLIC(DeReshapeFullyConnected)
