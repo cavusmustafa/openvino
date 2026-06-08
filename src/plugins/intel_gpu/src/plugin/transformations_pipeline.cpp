@@ -76,6 +76,7 @@
 #include "openvino/pass/constant_folding.hpp"
 #include "openvino/pass/manager.hpp"
 #include "openvino/pass/sdpa_to_vlsdpa.hpp"
+#include "openvino/pass/serialize.hpp"
 #include "ov_ops/gather_matmul_compressed.hpp"
 #include "plugin/transformations/bcast_and_pad_zp_buffers.hpp"
 #include "plugin/transformations/binary_conv_to_conv.hpp"
@@ -1717,5 +1718,6 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         manager.register_pass<ov::pass::Validate>();
         manager.run_passes(func);
     }
+    ov::pass::Serialize("gpu_transformed.xml", "gpu_transformed.bin").run_on_model(func);
 }
 }  // namespace ov::intel_gpu

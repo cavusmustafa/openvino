@@ -39,6 +39,7 @@
 #include "openvino/op/convolution.hpp"
 #include "openvino/op/paged_attention.hpp"
 #include "openvino/op/scaled_dot_product_attention.hpp"
+#include "openvino/pass/serialize.hpp"
 #include "openvino/runtime/aligned_buffer.hpp"
 #include "openvino/runtime/common.hpp"
 #include "openvino/runtime/icompiled_model.hpp"
@@ -412,6 +413,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
             denormals_as_zero(false);
         }
     }
+    ov::pass::Serialize("cpu_transformed.xml", "cpu_transformed.bin").run_on_model(cloned_model);
     return std::make_shared<CompiledModel>(cloned_model, shared_from_this(), conf, false);
 }
 
