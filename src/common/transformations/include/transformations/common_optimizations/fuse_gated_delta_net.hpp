@@ -40,6 +40,25 @@ public:
 
 /**
  * @ingroup ov_transformation_common_api
+ * @brief Fuses a torch.export `scan`-generated Loop into an internal GatedDeltaNet operation.
+ *
+ * The OpenVINO PyTorch FX frontend lowers a PyTorch `scan` over the delta-rule recurrence to a
+ * Loop that carries the recurrent state as a merged input and consumes q/k/v/g/beta as sliced
+ * inputs (axis 0 = time), collecting the per-step output via concatenated slices. This differs
+ * structurally from `FuseGDNLoop` (which expects a ScatterUpdate-into-buffer body), so this pass
+ * matches the scan variant: a Loop with exactly one 4D merged state input and five sliced inputs
+ * whose body implements `h*exp(g)`, delta, state update, and output reduction. The external sliced
+ * inputs are the full sequence tensors, which are fed directly to `GatedDeltaNet`.
+ */
+
+class TRANSFORMATIONS_API FuseScanGDN : public ov::pass::MatcherPass {
+public:
+    OPENVINO_MATCHER_PASS_RTTI("FuseScanGDN");
+    FuseScanGDN();
+};
+
+/**
+ * @ingroup ov_transformation_common_api
  * @brief Fuse l2_norm into GatedDeltaNet
  */
 

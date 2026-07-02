@@ -42,6 +42,7 @@
 #include "openvino/op/transpose.hpp"
 #include "openvino/op/unsqueeze.hpp"
 #include "openvino/op/util/gather_base.hpp"
+#include "openvino/op/util/multi_subgraph_base.hpp"
 #include "openvino/op/util/gather_nd_base.hpp"
 #include "openvino/op/util/op_types.hpp"
 #include "openvino/op/util/squeeze_base.hpp"
@@ -276,6 +277,119 @@ ov::pass::FuseGDNLoop::FuseGDNLoop() {
     };
 
     auto m = std::make_shared<ov::pass::pattern::Matcher>(loop_output, "FuseGDNLoop");
+    register_matcher(m, callback);
+}
+
+namespace {
+
+// Verify the Loop body implements the delta-rule recurrence produced by a PyTorch `scan`:
+//   gated = state * exp(gate); proj = reduce_sum(gated * key, -2); delta = value - proj;
+//   new_state = gated + key * unsqueeze(delta * beta, -2); out = reduce_sum(new_state * query, -2)
+// We check the body has the characteristic op set (Exp, the state Multiply, ReduceSum(delta),
+// Subtract, the state-update Add) rather than an exact isomorphism, which is robust to the
+// squeeze/unsqueeze bookkeeping the frontend inserts around sliced inputs.
+bool matches_scan_gdn_body(const std::shared_ptr<ov::Model>& body) {
+    bool has_exp = false, has_sub = false, has_add = false;
+    size_t reduce_sum_count = 0, multiply_count = 0;
+    for (const auto& op : body->get_ordered_ops()) {
+        if (ov::is_type<v0::Exp>(op))
+            has_exp = true;
+        else if (ov::is_type<v1::Subtract>(op))
+            has_sub = true;
+        else if (ov::is_type<v1::Add>(op))
+            has_add = true;
+        else if (ov::is_type<v1::ReduceSum>(op))
+            reduce_sum_count++;
+        else if (ov::is_type<v1::Multiply>(op))
+            multiply_count++;
+    }
+    // delta-rule body has exactly the gate Exp, >=2 ReduceSum (proj + output), the delta Subtract,
+    // the state-update Add, and several Multiplies (gate decay, proj, outer update, weighted out).
+    return has_exp && has_sub && has_add && reduce_sum_count >= 2 && multiply_count >= 4;
+}
+
+}  // namespace
+
+ov::pass::FuseScanGDN::FuseScanGDN() {
+    auto loop_pattern = pattern::wrap_type<ov::op::v5::Loop>();
+
+    ov::matcher_pass_callback callback = [OV_CAPTURE_CPY_AND_THIS](ov::pass::pattern::Matcher& m) {
+        auto loop = ov::as_type_ptr<ov::op::v5::Loop>(m.get_match_root());
+        if (!loop) {
+            return false;
+        }
+        // Expect exactly one merged input (the recurrent state) and five sliced inputs
+        // (q, k, v, g, beta) in that body-parameter order.
+        std::shared_ptr<ov::op::v0::Parameter> state_param;
+        ov::Output<ov::Node> state_input;
+        std::map<int64_t, ov::Output<ov::Node>> sliced_by_body_idx;  // body_param_index -> external input
+        for (const auto& desc : loop->get_input_descriptions()) {
+            if (auto merged = ov::as_type_ptr<ov::op::util::MultiSubGraphOp::MergedInputDescription>(desc)) {
+                if (state_param) {
+                    return false;  // more than one merged input -> not our pattern
+                }
+                state_input = loop->input_value(merged->m_input_index);
+                state_param = loop->get_function()->get_parameters()[merged->m_body_parameter_index];
+            } else if (auto sliced = ov::as_type_ptr<ov::op::util::MultiSubGraphOp::SliceInputDescription>(desc)) {
+                if (sliced->m_axis != 0) {
+                    return false;
+                }
+                sliced_by_body_idx[sliced->m_body_parameter_index] = loop->input_value(sliced->m_input_index);
+            }
+        }
+        if (!state_param || sliced_by_body_idx.size() != 5) {
+            return false;
+        }
+        if (loop->get_output_size() != 1) {
+            return false;
+        }
+        if (!matches_scan_gdn_body(loop->get_function())) {
+            return false;
+        }
+
+        // Sliced inputs are ordered by body-parameter index. The scan translator assigns them in
+        // (q, k, v, g, beta) order right after the state parameter, so the five sliced entries in
+        // ascending body-index order are exactly q, k, v, g, beta.
+        std::vector<ov::Output<ov::Node>> xs;
+        for (const auto& kv : sliced_by_body_idx) {
+            xs.push_back(kv.second);
+        }
+        auto q = xs[0], k = xs[1], v = xs[2], g = xs[3], beta = xs[4];
+
+        // Restrict to the single-sequence (no explicit batch) scan form the GDN forward emits:
+        //   external q/k/v are rank 3 [seq, head, dim], g/beta rank 2 [seq, head],
+        //   state rank 3 [head, k_head_size, v_head_size].
+        // GatedDeltaNet wants q/k/v [batch, seq, head, dim] (rank 4), state [batch, head, k, v]
+        // (rank 4), g/beta [batch, seq, head] (rank 3): add a leading batch=1 to each.
+        auto rank_of = [](const ov::Output<ov::Node>& o) -> int64_t {
+            const auto& r = o.get_partial_shape().rank();
+            return r.is_static() ? r.get_length() : -1;
+        };
+        if (rank_of(q) != 3 || rank_of(k) != 3 || rank_of(v) != 3 || rank_of(g) != 2 ||
+            rank_of(beta) != 2 || rank_of(state_input) != 3) {
+            return false;
+        }
+        auto axis0 = v0::Constant::create(ov::element::i64, ov::Shape{1}, {0});
+        auto q4 = std::make_shared<v0::Unsqueeze>(q, axis0);
+        auto k4 = std::make_shared<v0::Unsqueeze>(k, axis0);
+        auto v4 = std::make_shared<v0::Unsqueeze>(v, axis0);
+        auto g3 = std::make_shared<v0::Unsqueeze>(g, axis0);
+        auto beta3 = std::make_shared<v0::Unsqueeze>(beta, axis0);
+        auto state4 = std::make_shared<v0::Unsqueeze>(state_input, axis0);
+
+        auto gdn = std::make_shared<ov::op::internal::GatedDeltaNet>(
+            ov::OutputVector{q4, k4, v4, state4, g3, beta3});
+        gdn->set_friendly_name(loop->get_friendly_name());
+
+        // GatedDeltaNet output is [batch, seq, head, v_head_size]; the Loop output was the
+        // concatenated per-step output [seq, head, v_head_size]. Squeeze the batch dim back.
+        auto out_squeezed = std::make_shared<v0::Squeeze>(gdn->output(0), axis0);
+        ov::copy_runtime_info(loop, {gdn, out_squeezed, q4, k4, v4, g3, beta3, state4, axis0});
+        loop->output(0).replace(out_squeezed);
+        return true;
+    };
+
+    auto m = std::make_shared<ov::pass::pattern::Matcher>(loop_pattern, "FuseScanGDN");
     register_matcher(m, callback);
 }
 
@@ -517,6 +631,8 @@ bool ov::pass::GatedDeltaNetFusion::run_on_model(const std::shared_ptr<ov::Model
     auto symbolic_ctx_manager = symbolic_optimizations.get_manager();
     symbolic_ctx_manager->register_pass<ov::pass::RemoveConcatSliceAfterLoop>();
     symbolic_ctx_manager->register_pass<ov::pass::FuseGDNLoop>();
+    // scan-generated (concatenated-slices) Loop variant from the PyTorch FX frontend.
+    symbolic_ctx_manager->register_pass<ov::pass::FuseScanGDN>();
     // remove redundant transpose after loop fusion, which are inserted by FuseGDNLoop
     symbolic_ctx_manager->register_pass<ov::pass::TransposeFuse>();
     symbolic_ctx_manager->register_pass<ov::pass::FuseL2NormIntoGDN>();

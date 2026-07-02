@@ -167,6 +167,7 @@ OP_CONVERTER(translate_log10);
 OP_CONVERTER(translate_logsumexp);
 OP_CONVERTER(translate_loop);
 OP_CONVERTER(translate_while_loop_fx);
+OP_CONVERTER(translate_scan_fx);
 OP_CONVERTER(translate_lstm);
 OP_CONVERTER(translate_masked_fill);
 OP_CONVERTER(translate_masked_scatter);
@@ -1190,6 +1191,7 @@ const std::unordered_map<std::string, CreatorFunction> get_supported_ops_fx() {
         // Higher-order operations from torch.export (torch.cond, torch.while_loop, etc.)
         {"cond", op::translate_cond_fx},
         {"while_loop", op::translate_while_loop_fx},
+        {"scan", op::translate_scan_fx},
     };
 };
 
