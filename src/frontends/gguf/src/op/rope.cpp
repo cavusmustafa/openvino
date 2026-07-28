@@ -45,12 +45,8 @@ OutputVector translate_rope(const NodeContext& context) {
     auto data_node = context.get_input(0).get_node_shared_ptr();
     auto output_shape = context.get_output_shape().to_shape();
     auto rope_config = context.get_attribute<RopeConfig>("rope_config");
-    const int mode = (op_case & 0xFFFF0000) >> 16;
+    const auto mode = static_cast<RopeConfig::Type>((op_case & 0xFFFF0000) >> 16);
     op_case = (op_case & 0x0000FFFF);
-
-    constexpr int TYPE_NORMAL = 0;
-    constexpr int TYPE_NEOX = 1;
-    constexpr int TYPE_IMROPE = 2;
 
     Output<Node> cos_theta_node;
     Output<Node> sin_theta_node;
@@ -63,13 +59,13 @@ OutputVector translate_rope(const NodeContext& context) {
         if (context.get_input_size() == 3) {
             rope_freqs_weight = context.get_input(2).get_node_shared_ptr();
         }
-        auto sin_cos = make_sin_cos(rope_config, inp_pos, rope_freqs_weight, mode == TYPE_IMROPE);
+        auto sin_cos = make_sin_cos(rope_config, inp_pos, rope_freqs_weight, mode == RopeConfig::Type::IMROPE);
         sin_theta_node = sin_cos.first;
         cos_theta_node = sin_cos.second;
     }
 
     // The canonical [1, -1, n_head, head_size] reshape target (token count on the dynamic axis),
-    // used by the VIEW prologue and the TYPE_NORMAL stack below.
+    // used by the VIEW prologue and the NORMAL stack below.
     auto make_bhsd_shape = [&]() {
         return ov::op::v0::Constant::create(
             ov::element::i64,
@@ -84,7 +80,7 @@ OutputVector translate_rope(const NodeContext& context) {
         data_node = std::make_shared<ov::op::v1::Reshape>(data_node, make_bhsd_shape(), false);
     }
 
-    if (mode == TYPE_NORMAL) {
+    if (mode == RopeConfig::Type::NORMAL) {
         // Emit the Flux-style interleaved RoPE pattern so ov::pass::RoPEFusionFlux
         // folds this subgraph into ov::op::internal::RoPE → GPU ocl::rope::opt kernel.
         // RoPEFusionFlux requires rank-4 x with static last two dims [n_heads, head_size].
@@ -129,7 +125,7 @@ OutputVector translate_rope(const NodeContext& context) {
         auto y1 = std::make_shared<ov::op::v1::Multiply>(data_node, cos_full);
         auto y2 = std::make_shared<ov::op::v1::Multiply>(x_rotated, sin_full);
         res    = std::make_shared<ov::op::v1::Add>(y1, y2);
-    } else if (mode == TYPE_NEOX) {
+    } else if (mode == RopeConfig::Type::NEOX) {
         // Partial rotary (ggml n_dims < head_dim): only the first n_dims of every head are
         // rotated; the remaining tail is passed through unchanged. cos/sin have width n_dims/2,
         // so the rotated block must be exactly n_dims wide.
@@ -157,7 +153,7 @@ OutputVector translate_rope(const NodeContext& context) {
         Output<Node> rotated = ov::decomposition::rope(reg, rotary_in, cos_theta_node, sin_theta_node, n_rot / 2);
         res = (n_rot < head_dim) ? std::make_shared<ov::op::v0::Concat>(ov::OutputVector{rotated, pass_through}, -1)
                                  : rotated;
-    } else if (mode == TYPE_IMROPE) {
+    } else if (mode == RopeConfig::Type::IMROPE) {
         // Partial rotary (ggml n_dims < head_dim): only the first n_rot dims of every head are
         // rotated, the tail is passed through unchanged -- e.g. qwen3.5 has head_dim 256 but
         // rope.dimension_count 64. cos/sin carry width n_rot/2, so the rotated block must be
