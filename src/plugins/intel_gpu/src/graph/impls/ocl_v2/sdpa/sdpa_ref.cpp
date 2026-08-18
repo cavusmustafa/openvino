@@ -106,15 +106,24 @@ protected:
 
             if (!params.is_dynamic()) {
                 auto desc = params.typed_desc<scaled_dot_product_attention>();
+                // Must match the semantic (transpose-order-aware) quantities baked into this kernel's own JIT
+                // constants (NUM_HEADS/TARGET_SEQ_LEN/HEAD_SIZE, set from Q's input layout in
+                // SDPABase::get_jit_constants()) -- NOT the query tensor's raw bfyx storage axes. ggml-openvino
+                // can emit Q with seq_len and num_heads swapped relative to canonical bfyx=[batch,heads,seq,head]
+                // storage order, so reading FEATURE/Y directly (as if bfyx were already semantically ordered)
+                // silently computes the wrong global work size -- the OpenCL kernel then indexes its `tmp_buf`
+                // scratch buffer using the JIT-correct (and therefore different) TARGET_SEQ_LEN/NUM_HEADS,
+                // running past the end of a buffer sized for the wrong work size and hitting CL_OUT_OF_RESOURCES.
+                auto extended_input_q_transpose_order = extend_order_in_num_heads_dim(desc->input_q_transpose_order);
+                const auto& q_l = params.get_input_layout(0);
 
-                const auto& out_l = params.output_layouts[0];
-                auto b = extract_channel(ChannelName::BATCH, out_l);
-                auto f = extract_channel(ChannelName::FEATURE, out_l);
-                auto y = extract_channel(ChannelName::Y, out_l);
-                auto x = extract_channel(ChannelName::X, out_l);
+                const auto b = get_batch_size(q_l, extended_input_q_transpose_order);
+                const auto heads_num = get_num_heads(q_l, extended_input_q_transpose_order);
+                const auto target_seq_len = get_seq_length(q_l, extended_input_q_transpose_order);
+                const auto head_size = get_head_size(q_l, extended_input_q_transpose_order);
 
-                wgs.global = {b * f, y, x};
-                wgs.local = {1, 1, x};
+                wgs.global = {static_cast<size_t>(b * heads_num), static_cast<size_t>(target_seq_len), static_cast<size_t>(head_size)};
+                wgs.local = {1, 1, static_cast<size_t>(head_size)};
             }
         }};
     }
