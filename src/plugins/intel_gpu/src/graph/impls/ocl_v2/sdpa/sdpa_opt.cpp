@@ -10,6 +10,8 @@
 
 #include "sdpa_opt.hpp"
 
+#include <cstdlib>
+
 #include "../primitive_ocl_base.hpp"
 #include "../utils/kernel_generator.hpp"
 #include "common_utils/jitter.hpp"
@@ -179,6 +181,14 @@ public:
 
 bool SDPAOpt::supports_micro_sdpa(const RuntimeParams& params) {
 #ifdef ENABLE_ONEDNN_FOR_GPU
+    // Experimental override to force the sdpa_opt (split-K) path instead of micro-SDPA, for
+    // comparing the two decode-attention schedules without a full recompile.
+    static const bool disable_micro_sdpa = std::getenv("OV_EXP_DISABLE_MICRO_SDPA") != nullptr;
+    if (disable_micro_sdpa) {
+        GPU_DEBUG_TRACE_DETAIL << "OV_EXP_DISABLE_MICRO_SDPA set: micro-SDPA disabled, forcing sdpa_opt\n";
+        return false;
+    }
+
     auto& engine = params.get_program().get_engine();
     const auto& device_info = engine.get_device_info();
     auto desc = params.typed_desc<scaled_dot_product_attention>();
