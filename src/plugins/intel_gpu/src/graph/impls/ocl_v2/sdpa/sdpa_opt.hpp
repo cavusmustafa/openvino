@@ -57,7 +57,13 @@ struct SDPAOpt : public ImplementationManager {
 
         auto dim_size = desc->input_k_transpose_order.size();
         auto k_head_size = k_layout.get_partial_shape()[desc->input_k_transpose_order[dim_size - 1]];
-        if (k_head_size.is_dynamic()) {
+        // The live per-node layout can report head_size as dynamic even when it is a genuine static
+        // per-model constant (e.g. downstream of a Slice for an SWA layer's windowed K/V read) --
+        // fall back to the value captured from the op's own declared shape at conversion time
+        // (desc->k_head_size, populated by GetStaticHeadDims in plugin/ops/scaled_dot_product_attention.cpp)
+        // before rejecting outright. Without this, every SWA layer in a model unconditionally falls
+        // back to SDPARef regardless of shape_type, even though desc->k_head_size is already known.
+        if (k_head_size.is_dynamic() && desc->k_head_size <= 0) {
             return false;
         }
 

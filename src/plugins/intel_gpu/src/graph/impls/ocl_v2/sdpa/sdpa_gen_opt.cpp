@@ -64,6 +64,19 @@ JitConstants SDPAOptGeneratorBase::get_jit_constants_base(const kernel_impl_para
         k_head_size = get_head_size(k_layout, extended_input_k_transpose_order);
         v_head_size = get_head_size(v_layout, extended_input_v_transpose_order);
 
+        // The live per-node layout can report head_size as dynamic even when it is a genuine static
+        // per-model constant (e.g. downstream of a Slice for an SWA layer's windowed K/V read) -- fall
+        // back to the value captured from the op's own declared shape at conversion time (desc->k/v_head_size,
+        // populated by GetStaticHeadDims in plugin/ops/scaled_dot_product_attention.cpp). Mirrors the same
+        // fallback SDPABase::get_jit_constants() already applies for its own HEAD_SIZE/K_HEAD_SIZE/V_HEAD_SIZE
+        // constants -- this call site independently recomputes k/v_head_size and was missing the same guard.
+        if (k_head_size <= 0 && desc->k_head_size > 0) {
+            k_head_size = desc->k_head_size;
+        }
+        if (v_head_size <= 0 && desc->v_head_size > 0) {
+            v_head_size = desc->v_head_size;
+        }
+
         // 4-bit KV-cache: K/V layouts have head_size/2 due to u4→i8 packing.
         // Override with logical head size from query (which is not packed).
         {

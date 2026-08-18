@@ -164,17 +164,30 @@ inline size_t micro_get_head_size(const kernel_impl_params& params, size_t qkv_i
         }
     } else {
         const auto desc = params.typed_desc<scaled_dot_product_attention>();
+        // The live per-node layout can report head_size as dynamic even when it is a genuine static
+        // per-model constant (e.g. downstream of a Slice for an SWA layer's windowed K/V read) -- fall
+        // back to the value captured from the op's own declared shape at conversion time (desc->q/k/v_head_size,
+        // populated by GetStaticHeadDims in plugin/ops/scaled_dot_product_attention.cpp) before throwing.
         switch (qkv_idx) {
         case 0: {
-            const auto head_size = get_head_size(params.input_layouts[0], extend_order_in_num_heads_dim(desc->input_q_transpose_order));
+            auto head_size = get_head_size(params.input_layouts[0], extend_order_in_num_heads_dim(desc->input_q_transpose_order));
+            if (head_size <= 0 && desc->q_head_size > 0) {
+                head_size = desc->q_head_size;
+            }
             return ensure_positive_dim(head_size, "head size for Q");
         }
         case 1: {
-            const auto head_size = get_head_size(params.input_layouts[1], extend_order_in_num_heads_dim(desc->input_k_transpose_order));
+            auto head_size = get_head_size(params.input_layouts[1], extend_order_in_num_heads_dim(desc->input_k_transpose_order));
+            if (head_size <= 0 && desc->k_head_size > 0) {
+                head_size = desc->k_head_size;
+            }
             return ensure_positive_dim(head_size, "head size for K");
         }
         case 2: {
-            const auto head_size = get_head_size(params.input_layouts[2], extend_order_in_num_heads_dim(desc->input_v_transpose_order));
+            auto head_size = get_head_size(params.input_layouts[2], extend_order_in_num_heads_dim(desc->input_v_transpose_order));
+            if (head_size <= 0 && desc->v_head_size > 0) {
+                head_size = desc->v_head_size;
+            }
             return ensure_positive_dim(head_size, "head size for V");
         }
         default:
