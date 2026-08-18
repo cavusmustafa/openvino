@@ -306,26 +306,27 @@ JitConstants SDPABase::get_jit_constants(const kernel_impl_params& params) const
         LayoutJitter k_jitter(updated_params.input_layouts[1], in_offsets_map.at(1));
         jit.make("SOURCE_SEQ_LEN", k_jitter.dim(get_transposed_channel(ChannelName::Y, extended_input_k_transpose_order)));
 
-        const auto q_head_size = ensure_positive_dim(get_head_size(params.get_input_layout(0), extended_input_q_transpose_order),
-                                                     "q_head_size",
-                                                     "SDPA: invalid non-positive ",
-                                                     " for JIT constants generation");
-        const auto q_num_head = ensure_positive_dim(get_num_heads(params.get_input_layout(0), extended_input_q_transpose_order),
-                                                    "q_num_head",
-                                                    "SDPA: invalid non-positive ",
-                                                    " for JIT constants generation");
-        auto k_head_size = ensure_positive_dim(get_head_size(params.get_input_layout(1), extended_input_k_transpose_order),
-                                               "k_head_size",
-                                               "SDPA: invalid non-positive ",
-                                               " for JIT constants generation");
-        const auto k_num_head = ensure_positive_dim(get_num_heads(params.get_input_layout(1), extended_input_k_transpose_order),
-                                                    "k_num_head",
-                                                    "SDPA: invalid non-positive ",
-                                                    " for JIT constants generation");
-        auto v_head_size = ensure_positive_dim(get_head_size(params.get_input_layout(2), extended_input_v_transpose_order),
-                                               "v_head_size",
-                                               "SDPA: invalid non-positive ",
-                                               " for JIT constants generation");
+        // The live per-call GPU-plugin layout can report a dim as dynamic even when it is a
+        // genuine static per-model constant (e.g. downstream of a Slice whose *other* bound is a
+        // legitimate runtime value, such as a growing KV-cache length) -- fall back to the value
+        // captured from the op's own declared shape at conversion time (desc->*) in that case,
+        // rather than asserting. See GetStaticHeadDims in plugin/ops/scaled_dot_product_attention.cpp.
+        auto resolve_head_dim = [](int64_t live_value, int64_t static_fallback, const char* dim_name) {
+            if (live_value <= 0 && static_fallback > 0) {
+                live_value = static_fallback;
+            }
+            return ensure_positive_dim(live_value, dim_name, "SDPA: invalid non-positive ", " for JIT constants generation");
+        };
+        const auto q_head_size =
+            resolve_head_dim(get_head_size(params.get_input_layout(0), extended_input_q_transpose_order), desc->q_head_size, "q_head_size");
+        const auto q_num_head =
+            resolve_head_dim(get_num_heads(params.get_input_layout(0), extended_input_q_transpose_order), desc->q_num_heads, "q_num_head");
+        auto k_head_size =
+            resolve_head_dim(get_head_size(params.get_input_layout(1), extended_input_k_transpose_order), desc->k_head_size, "k_head_size");
+        const auto k_num_head =
+            resolve_head_dim(get_num_heads(params.get_input_layout(1), extended_input_k_transpose_order), desc->k_num_heads, "k_num_head");
+        auto v_head_size =
+            resolve_head_dim(get_head_size(params.get_input_layout(2), extended_input_v_transpose_order), desc->v_head_size, "v_head_size");
 
         // 4-bit KV-cache: K/V layouts have head_size/2 due to u4→i8 packing.
         // Override with logical head size from query (which is not packed).

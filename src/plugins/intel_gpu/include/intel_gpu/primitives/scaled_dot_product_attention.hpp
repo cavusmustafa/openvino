@@ -84,6 +84,19 @@ struct scaled_dot_product_attention : public primitive_base<scaled_dot_product_a
     std::optional<float> attn_mask_val;
     std::optional<float> scale_val;
 
+    // Q/K/V head_size and num_heads as declared on the original ov::Node's input shapes at
+    // op-conversion time, when they were still resolvable. Used as a fallback in
+    // SDPABase::get_jit_constants() when the live per-call input_layout reports one of these
+    // dims as dynamic (e.g. a non-constant-foldable Slice bound feeding K/V upstream) -- these
+    // are static per-model constants, so a dynamic axis elsewhere in the same shape should never
+    // make them unresolvable. -1 means "not populated" (falls through to the live-layout path
+    // unchanged). Mirrors cldnn::paged_attention's k_head_size/v_head_size.
+    int64_t q_head_size = -1;
+    int64_t q_num_heads = -1;
+    int64_t k_head_size = -1;
+    int64_t k_num_heads = -1;
+    int64_t v_head_size = -1;
+
     size_t hash() const override {
         size_t seed = primitive::hash();
         seed = hash_combine(seed, is_causal);
@@ -111,6 +124,11 @@ struct scaled_dot_product_attention : public primitive_base<scaled_dot_product_a
         seed = hash_combine(seed, quantization_attributes.scale_dt.hash());
         seed = hash_combine(seed, quantization_attributes.zp_dt.hash());
         seed = hash_combine(seed, quantization_attributes.output_storage_type);
+        seed = hash_combine(seed, q_head_size);
+        seed = hash_combine(seed, q_num_heads);
+        seed = hash_combine(seed, k_head_size);
+        seed = hash_combine(seed, k_num_heads);
+        seed = hash_combine(seed, v_head_size);
 
         return seed;
     }
@@ -139,7 +157,12 @@ struct scaled_dot_product_attention : public primitive_base<scaled_dot_product_a
                quantization_attributes.quantization_dt == rhs_casted.quantization_attributes.quantization_dt &&
                quantization_attributes.scale_dt == rhs_casted.quantization_attributes.scale_dt &&
                quantization_attributes.zp_dt == rhs_casted.quantization_attributes.zp_dt &&
-               quantization_attributes.quantization_type == rhs_casted.quantization_attributes.quantization_type;
+               quantization_attributes.quantization_type == rhs_casted.quantization_attributes.quantization_type &&
+               q_head_size == rhs_casted.q_head_size &&
+               q_num_heads == rhs_casted.q_num_heads &&
+               k_head_size == rhs_casted.k_head_size &&
+               k_num_heads == rhs_casted.k_num_heads &&
+               v_head_size == rhs_casted.v_head_size;
     }
 
     void save(BinaryOutputBuffer& ob) const override {
@@ -169,6 +192,11 @@ struct scaled_dot_product_attention : public primitive_base<scaled_dot_product_a
         ob << make_data(&quantization_attributes.output_storage_type, sizeof(quantization_attributes.output_storage_type));
         ob << quantization_attributes.scales_zp_output_order;
         ob << quantization_attributes.group_sizes;
+        ob << q_head_size;
+        ob << q_num_heads;
+        ob << k_head_size;
+        ob << k_num_heads;
+        ob << v_head_size;
     }
 
     void load(BinaryInputBuffer& ib) override {
@@ -200,6 +228,11 @@ struct scaled_dot_product_attention : public primitive_base<scaled_dot_product_a
         ib >> make_data(&quantization_attributes.output_storage_type, sizeof(quantization_attributes.output_storage_type));
         ib >> quantization_attributes.scales_zp_output_order;
         ib >> quantization_attributes.group_sizes;
+        ib >> q_head_size;
+        ib >> q_num_heads;
+        ib >> k_head_size;
+        ib >> k_num_heads;
+        ib >> v_head_size;
     }
 
     size_t get_compression_scales_inputs_num() const {

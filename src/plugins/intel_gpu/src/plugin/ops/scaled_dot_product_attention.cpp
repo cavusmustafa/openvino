@@ -81,6 +81,52 @@ static void GetNewOrder(ProgramBuilder&p, const std::shared_ptr<ov::op::internal
     }
 }
 
+// Read head_size / num_heads from an input's DECLARED ov-core PartialShape at op-conversion
+// time, honouring the same `order` (transpose_order) convention SDPABase::get_jit_constants()
+// uses at runtime (get_head_size/get_num_heads in sdpa_utils.hpp: head_size is the axis at
+// order[order.size()-1], num_heads is at order[order.size()-3], or 1 for a 3D BLS input with no
+// separate heads axis). Used as a static fallback there, which otherwise derives these from the
+// LIVE per-call GPU-plugin layout -- a separate, lossier mechanism than ov-core's own shape
+// inference that can report a dim as dynamic even when it is a genuine static per-model
+// constant (e.g. downstream of a Slice whose *other* bound is a legitimate runtime value, such
+// as a growing KV-cache length). -1 means "not statically known here either", so the fallback
+// is simply not populated and behavior is unchanged from before this fix.
+static void GetStaticHeadDims(const std::shared_ptr<ov::op::Op>& op,
+                              size_t input_idx,
+                              const std::vector<int64_t>& order,
+                              int64_t& head_size,
+                              int64_t& num_heads) {
+    head_size = -1;
+    num_heads = -1;
+    if (op->get_input_size() <= input_idx) {
+        return;
+    }
+    const auto pshape = op->get_input_partial_shape(input_idx);
+    if (pshape.rank().is_dynamic()) {
+        return;
+    }
+    const auto rank = pshape.size();
+    if (rank < 3) {
+        return;
+    }
+    const auto& axis_order = !order.empty() ? order : ov::op::internal::SDPA::default_order(rank);
+    if (axis_order.size() != rank) {
+        return;
+    }
+    const auto head_size_axis = static_cast<size_t>(axis_order[rank - 1]);
+    if (pshape[head_size_axis].is_static()) {
+        head_size = pshape[head_size_axis].get_length();
+    }
+    if (rank == 3) {
+        num_heads = 1;
+    } else {
+        const auto num_heads_axis = static_cast<size_t>(axis_order[rank - 3]);
+        if (pshape[num_heads_axis].is_static()) {
+            num_heads = pshape[num_heads_axis].get_length();
+        }
+    }
+}
+
 static void CreateScaledDotProductAttentionOp(ProgramBuilder& p, const std::shared_ptr<ov::op::v13::ScaledDotProductAttention>& op) {
     // if transpose fusion is disabled, this is used
 
@@ -111,6 +157,11 @@ static void CreateScaledDotProductAttentionOp(ProgramBuilder& p, const std::shar
     if (scalar_attn_mask) {
         sdpa_prim.attn_mask_val = scalar_attn_mask->cast_vector<float>()[0];
     }
+
+    int64_t unused_v_num_heads;
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::QUERY, order, sdpa_prim.q_head_size, sdpa_prim.q_num_heads);
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::KEY, order, sdpa_prim.k_head_size, sdpa_prim.k_num_heads);
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::VALUE, order, sdpa_prim.v_head_size, unused_v_num_heads);
 
     p.add_primitive(*op, sdpa_prim);
 }
@@ -146,6 +197,11 @@ static void CreateSDPAOp(ProgramBuilder& p, const std::shared_ptr<ov::op::intern
     if (scalar_attn_mask) {
         sdpa_prim.attn_mask_val = scalar_attn_mask->cast_vector<float>()[0];
     }
+
+    int64_t unused_v_num_heads;
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::QUERY, transpose_orders[0], sdpa_prim.q_head_size, sdpa_prim.q_num_heads);
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::KEY, transpose_orders[1], sdpa_prim.k_head_size, sdpa_prim.k_num_heads);
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::VALUE, transpose_orders[2], sdpa_prim.v_head_size, unused_v_num_heads);
 
     p.add_primitive(*op, sdpa_prim);
 }
@@ -185,6 +241,11 @@ static void CreateIndirectSDPAOp(ProgramBuilder& p, const std::shared_ptr<ov::op
     if (scalar_attn_mask) {
         sdpa_prim.attn_mask_val = scalar_attn_mask->cast_vector<float>()[0];
     }
+
+    int64_t unused_v_num_heads;
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::QUERY, transpose_orders[0], sdpa_prim.q_head_size, sdpa_prim.q_num_heads);
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::KEY, transpose_orders[1], sdpa_prim.k_head_size, sdpa_prim.k_num_heads);
+    GetStaticHeadDims(op, cldnn::scaled_dot_product_attention::ScaledDotProductAttentionInputIdx::VALUE, transpose_orders[2], sdpa_prim.v_head_size, unused_v_num_heads);
 
     p.add_primitive(*op, sdpa_prim);
 }
