@@ -103,10 +103,32 @@ std::pair<int64_t, int64_t> SDPABase::get_gqa_params(const kernel_impl_params& p
         const auto num_heads_dim = 1;
         int64_t broadcast_axis = -1;
         int64_t group_size = -1;
-        if (query_shape[num_heads_dim].is_static() && key_shape[num_heads_dim].is_static() && value_shape[num_heads_dim].is_static()) {
-            if (query_shape[num_heads_dim].get_length() > key_shape[num_heads_dim].get_length()) {
-                broadcast_axis = desc->input_k_transpose_order[num_heads_dim];
-                group_size = query_shape[num_heads_dim].get_length() / key_shape[num_heads_dim].get_length();
+
+        // The live per-call layout can report num_heads as dynamic even when it is a genuine static
+        // per-model constant -- e.g. an SWA layer's K/V arrives via a Slice with a runtime window
+        // bound, which collapses the whole declared shape to [1,?,?,?]. Fall back to the values
+        // captured from the op's own declared shape at conversion time (desc->q/k_num_heads,
+        // populated by GetStaticHeadDims in plugin/ops/scaled_dot_product_attention.cpp), the same
+        // way head_size is recovered elsewhere in this file.
+        //
+        // This must not silently fall through: with GQA undetected, BROADCAST_GROUP_SIZE stays 1 and
+        // the kernel indexes K/V by the QUERY head index, reading past the real KV heads entirely.
+        auto resolve_num_heads = [](const ov::PartialShape& shape, size_t dim, int64_t static_fallback) -> int64_t {
+            if (shape.rank().is_static() && dim < shape.size() && shape[dim].is_static()) {
+                return shape[dim].get_length();
+            }
+            return static_fallback;
+        };
+
+        const int64_t q_num_heads = resolve_num_heads(query_shape, num_heads_dim, desc->q_num_heads);
+        const int64_t k_num_heads = resolve_num_heads(key_shape, num_heads_dim, desc->k_num_heads);
+        const int64_t v_num_heads = resolve_num_heads(value_shape, num_heads_dim, desc->k_num_heads);
+
+        if (q_num_heads > 0 && k_num_heads > 0 && v_num_heads > 0) {
+            if (q_num_heads > k_num_heads) {
+                broadcast_axis =
+                    desc->input_k_transpose_order.empty() ? num_heads_dim : desc->input_k_transpose_order[num_heads_dim];
+                group_size = q_num_heads / k_num_heads;
             }
         }
 
