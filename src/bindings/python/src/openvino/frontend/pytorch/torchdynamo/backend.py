@@ -103,12 +103,34 @@ def fx_openvino(subgraph, example_inputs, options=None):
             model = subgraph
         else:
             decompositions = _get_decompositions(options) + get_inf_decomposition_list()
+            # This retrace shares Dynamo's ShapeEnv (make_fx -> detect_fake_mode picks up the
+            # ambient TracingContext). Sharing is required: re-fakifying the inputs under a
+            # private mode loses the aliasing/mutation identity that view-mutation graphs rely
+            # on. But symbols this retrace allocates are sourced by an internal placeholder
+            # Dynamo never registers, so any shape guard on them (e.g. the numel check
+            # view/reshape emits through infer_size) makes Dynamo's guard codegen fail with an
+            # IndexError. Record which symbols are Dynamo's, then drop only the guards the
+            # retrace added that talk about symbols Dynamo has never heard of.
+            _shape_env = None
+            _tc = torch._guards.TracingContext.try_get()
+            if _tc is not None and _tc.fake_mode is not None:
+                _shape_env = _tc.fake_mode.shape_env
+            if _shape_env is not None:
+                _known_syms = set(_shape_env.var_to_sources)
+                _n_guards = len(_shape_env.guards)
             model = make_fx(
                 subgraph,
                 decomposition_table=get_decompositions(decompositions),
                 tracing_mode="fake",
                 _allow_non_fake_inputs=True,
             )(*example_inputs)
+            if _shape_env is not None:
+                _new_syms = set(_shape_env.var_to_sources) - _known_syms
+                if _new_syms:
+                    _shape_env.guards[_n_guards:] = [
+                        g for g in _shape_env.guards[_n_guards:]
+                        if not (g.expr.free_symbols & _new_syms)
+                    ]
             with torch.no_grad():
                 model.eval()
         partitioner = Partitioner(options)
