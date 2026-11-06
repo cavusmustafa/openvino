@@ -15,7 +15,7 @@ Installation, usage, environment variables and troubleshooting are in the
 | [src/op/paged_attention.cpp](../src/op/paged_attention.cpp), [src/op/gdn_attention.cpp](../src/op/gdn_attention.cpp) | Translators of the `ov_ext` operations the rewrites produce, see [custom operations](custom_operations.md) |
 | [src/transforms/canonicalize_float_precision.cpp](../src/transforms/canonicalize_float_precision.cpp) | f32-activation form for bf16/f16 models, see [narrow default float type](default_float_type.md) |
 | [NormalizeVLLMRoPE](../../../common/transformations/src/transformations/common_optimizations/normalize_vllm_rope.cpp) | Common optimization, run only for models with the `vllm_model` rt_info flag |
-| [tests/vllm_tests](../../../../tests/vllm_tests/) | End-to-end and unit tests, see [testing](vllm_tests.md) |
+| [tests/vllm_tests](../../../../tests/vllm_tests/) | End-to-end and unit tests, see [testing](tests.md) |
 
 The generic backend has no vLLM knowledge. Every vLLM-specific step lives in the `vllm` package and is reached
 through a fixed set of hooks ([listed here](torch_compile.md#hooks-for-integrations)), each of which is a no-op
@@ -33,7 +33,7 @@ CPUModelRunner.load_model (patched)
   3. _own_kv_cache_update: attention layers report forward_includes_kv_cache_update=True
   4. install the fused sampler, widen the CPU affinity, raise the dynamo cache limit
   5. model.forward = torch.compile(model.forward, backend="openvino", options=options)
-  6. optionally compile lm_head on OpenVINO (OV_LM_HEAD=1)
+  6. optionally compile lm_head on OpenVINO
 
 first forward (and every dynamo re-trace)
   aot_autograd -> fx_openvino -> Partitioner.make_partitions
@@ -49,13 +49,13 @@ every step
      side_channel binds __pa__* inputs from vLLM's forward context, then req.infer()
 ```
 
-`model_id` scopes the compiled-model caches to one model, so two models with the same architecture never share
-compiled graphs. Weight reloads (`reload_weights`, `finish_weight_update`) drop those caches and recompile.
+Weight reloads (`reload_weights`, `finish_weight_update`) drop the
+[compiled-model caches](torch_compile.md#compiled-model-caches) and recompile under a new `model_id`.
 
 ## The vLLM preset
 
 `options["vllm"] = True` expands into per-flag defaults ([preset.py](../../../bindings/python/src/openvino/frontend/pytorch/torchdynamo/vllm/preset.py));
-a flag set explicitly by the caller wins:
+a flag set explicitly by the caller wins. The flags the backend reads:
 
 | Flag | Preset | Effect |
 |---|---|---|
@@ -63,14 +63,14 @@ a flag set explicitly by the caller wins:
 | `pa_translate` | on | Mark `ov_ext.paged_attention` / `ov_ext.gdn_attention` as supported, so they stay in OV partitions; with `paged_attention`, OV owns the KV-cache write |
 | `no_fallback` | on | A failing conversion or OV execution raises instead of falling back to PyTorch |
 | `canonical_precision` | on | Pass the model dtype to the decoder as `default_float_type` |
-| `dynamic_shapes` | off | Tensor inputs are made fully dynamic only when every integer graph input could be tied to a tensor dimension (one compiled model then serves all token counts); otherwise they keep their traced shapes |
-| `gdn_translate`, `moe_translate` | on (not preset flags) | Individual switches for the GDN and MoE rewrites |
+| `dynamic_shapes` | off | Tensor inputs become dynamic only through the [shape-agnostic compile](torch_compile.md#compiled-model-caches) |
 
-The preset also fills the CPU compile config: `DYNAMIC_QUANTIZATION_GROUP_SIZE=32`, and an
-`INFERENCE_PRECISION_HINT` / `KV_CACHE_PRECISION` pair derived from the model's float type
-(`precision_config`). The two always name the same type, because the CPU PagedAttention kernel is only built for
-matching pairs: bf16 on AMX-BF16 hardware (for f16 and f32 models too), f32 otherwise.
-`OV_INFERENCE_PRECISION_HINT` and `OV_KV_CACHE_PRECISION` override the pair.
+The GDN and MoE rewrites have their own switches, `gdn_translate` and `moe_translate`, both on by default.
+
+The preset also fills CPU compile-config defaults, including an `INFERENCE_PRECISION_HINT` / `KV_CACHE_PRECISION`
+pair derived from the model's float type. The two must name the same type, because the CPU PagedAttention kernel
+is only built for matching pairs; the rule is in the user guide's
+[Precision](../../../bindings/python/src/openvino/frontend/pytorch/torchdynamo/vllm/README.md#precision) section.
 
 ## Graph rewrites
 
@@ -109,10 +109,10 @@ vLLM's own attention op would read a cache nobody writes, and several guards mak
 
 ## Side channel
 
-The KV cache, block tables and sequence metadata are not FX graph inputs. The translators create extra
-Parameters for them, named `__pa__<layer>__<field>` (per layer) and `__pa__shared__<field>` (shared by all
-layers), plus `__pa__gdn__...` for GDN state. `compile_hooks.register_pa_parameters` adds them to the model's
-inputs, and at every step `side_channel.py` binds them from `vllm.forward_context.get_forward_context()`:
+The KV cache, block tables and sequence metadata are not FX graph inputs; the translators create
+[side-channel Parameters](custom_operations.md#side-channel-parameters) for them.
+`compile_hooks.register_pa_parameters` adds them to the model's inputs, and at every step `side_channel.py` binds
+them from `vllm.forward_context.get_forward_context()`:
 
 | Parameter | Source |
 |---|---|
@@ -129,15 +129,13 @@ layer is bound to its target layer's cache.
 
 ## Execution fast path
 
-`runtime_hooks.infer_with_pa` binds the positional inputs and the side-channel inputs in port order. With
-`OV_FAST_INFER=1` (the plugin's default) it calls `set_tensor` only for ports whose value changed and reuses
-output views of statically-shaped outputs. Binding failures fall back to the plain `req.infer()` call;
+`runtime_hooks.infer_with_pa` binds the positional inputs and the side-channel inputs in port order. On the
+fast path (`OV_FAST_INFER`, see the user guide) it calls `set_tensor` only for ports whose value changed and
+reuses output views of statically-shaped outputs. Binding failures fall back to the plain `req.infer()` call;
 failures after inference started propagate, because inference has already updated the KV cache and GDN state.
 
 ## Invariants for changes
 
 * Keep vLLM knowledge in the `vllm` package; generic backend files only call the existing hooks.
 * Anything that can leave an attention call outside OV, or split a KV-sharing pair, must raise.
-* Side-channel Parameter names are a contract between the translators and `side_channel.py`; change both
-  together.
 * New CPU-config defaults go through the preset so caller-supplied keys keep priority.
